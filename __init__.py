@@ -3,6 +3,7 @@ from anki.notes import Note
 from aqt.utils import showInfo, qconnect
 from aqt.qt import *
 from aqt import gui_hooks
+from aqt import utils
 import html
 import re
 
@@ -10,7 +11,7 @@ import sys, os
 ADDON_PATH = os.path.dirname(__file__)
 sys.path.append(os.path.join(ADDON_PATH, "lib"))
 
-from .OpenAI_Anki import ask_ai
+from .OpenAI_Anki import write_ai_output_to_file
 
 
 def strip_html(text):
@@ -59,6 +60,9 @@ def get_note_row_english(n):
 
 def write_notes_to_file():
     with open(r"C:\Users\Vlad\Desktop\KRN.txt", 'a') as f:
+        f.seek(0)
+        f.truncate()
+
         card_ids = get_card_ids(tag="Transfer")
         for num in range(len(card_ids)):
             number_data = get_note_row_number(num)
@@ -122,17 +126,6 @@ def write_file_to_notes():
                 continue
 
 
-def get_list_of_words():
-    with open(r"C:\Users\Vlad\Desktop\KRN.txt", 'r', encoding='utf-8') as f:
-        list_of_words = f.read()
-        return list_of_words
-
-
-def write_ai_output_to_file():
-    with open(r"C:\Users\Vlad\Desktop\KRN2.txt", 'a', encoding='utf-8') as f:
-        f.write(f"{ask_ai(get_list_of_words())}")
-
-
 Transfer_Notes_to_file = QAction("Transfer Notes to file")
 qconnect(Transfer_Notes_to_file.triggered, write_notes_to_file)
 mw.form.menuTools.addAction(Transfer_Notes_to_file)
@@ -144,7 +137,3 @@ mw.form.menuTools.addAction(AI_to_file)
 Transfer_file_to_Notes = QAction("Transfer from file to Notes")
 qconnect(Transfer_file_to_Notes.triggered, write_file_to_notes)
 mw.form.menuTools.addAction(Transfer_file_to_Notes)
-
-
-# <div style="text-align: center;"></div>
-# <span style="color: rgb(255, 0, 0);"></span>

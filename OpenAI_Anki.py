@@ -1,9 +1,9 @@
 import requests
 import json
 import os
-import traceback
-from datetime import datetime
-import os
+from aqt import mw, utils
+from aqt.operations import QueryOp
+
 
 ADDON_PATH = os.path.dirname(__file__)
 config_file = os.path.join(ADDON_PATH, "config.json")
@@ -63,6 +63,12 @@ We’ve almost <span style="color: rgb(255, 0, 0);">run out</span> of fuel."
 List of words:"""
 
 
+def get_list_of_words():
+    with open(r"C:\Users\Vlad\Desktop\KRN.txt", 'r', encoding='utf-8') as f:
+        list_of_words = f.read()
+        return list_of_words
+
+
 def ask_ai(list_of_words):
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -85,5 +91,34 @@ def ask_ai(list_of_words):
 
     return output
 
+def on_success(output):
+    with open(r"C:\Users\Vlad\Desktop\KRN2.txt", 'a', encoding='utf-8') as f:
+        # f.seek(0)
+        # f.truncate()
 
+        f.write(f"{output}")
+
+def on_failure():
+    None
+
+# function that allows to make a request to API without freezing Anki
+# on_success is called with the return value of ask_ai
+def write_ai_output_to_file():
+    """
+    Main function to call - makes a request to OpenAI API and writes output in a file.
+    """
+
+    # Create the background operation
+    op = QueryOp(
+        parent=mw,
+        op=lambda col: ask_ai(get_list_of_words()),  # Runs in background
+        success=on_success  # Called when done
+    )
+
+    # To be added
+    # Handle failure
+    # op.failure(on_failure)
+
+    # Show progress dialog and run in background
+    op.with_progress("AI is generating sentences...").run_in_background()
 
