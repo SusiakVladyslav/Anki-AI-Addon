@@ -43,10 +43,11 @@ def get_card_ids(tag=Tag):
     card_ids = mw.col.find_cards(f"tag:{tag}")
     return card_ids
 
+
 def get_field(field,n):
     card = mw.col.get_card(get_card_ids(tag=Tag)[n])
     note = card.note()
-    return note[field]
+    return strip_html(note[field])
 
 
 def write_notes_to_file():
