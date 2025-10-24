@@ -137,4 +137,3 @@ def write_ai_output_to_file():
 
     # Show progress dialog and run in background
     op.with_progress("AI is generating sentences...").run_in_background()
-

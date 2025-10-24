@@ -25,11 +25,7 @@ Notes_info = config.get("Notes_info")
 Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
 AI_response = config.get("AI_response")
 AI_response_path = os.path.join(ADDON_PATH, AI_response)
-
-
-def new_file_message():
-    with open(AI_response_path, "a", encoding="utf-8") as f:
-        f.write("Hello ai response\n")
+Save_file_path = os.path.join(ADDON_PATH, "Save file.txt")
 
 
 def strip_html(text):
@@ -90,14 +86,34 @@ def write_file_to_notes():
         while n < len(lines):
             # A check whether a line is a number
             if lines[n].strip().isdigit():
-                n += 1
-                continue
+
+                card = mw.col.get_card(card_ids[card_num])
+                note = card.note()
+
+                if lines[n].strip() == note["Number"]:
+                    n += 1
+                    continue
+                else:
+                    utils.showWarning("The number of Note and current number is not the same.\nCreating a save file")
+                    with open(Save_file_path, 'a', encoding='utf-8') as save_file:
+                        with open(Notes_info_path, "r", encoding='utf-8') as notes_file:
+                            notes = notes_file.readlines()
+                        with open(AI_response_path, "r", encoding='utf-8') as AI_file:
+                            AI = AI_file.readlines()
+
+                        save_file.writelines(notes)
+                        save_file.write("\n---\n")
+                        save_file.writelines(AI)
+
+                        n += 1
+
             # A check whether a line is empty
             elif lines[n] == "\n":
                 n += 1
                 i = 0
                 card_num += 1
                 continue
+
             # A check whether a line is Korean and whether it is a new word
             elif re.search(r'[\uac00-\ud7a3]', lines[n]) and i == 0:
                 Korean = lines[n].strip()
@@ -113,6 +129,7 @@ def write_file_to_notes():
                 n += 3
                 i = 1
                 continue
+
             # A condition which happens if word has several translations and meanings
             else:
                 Korean = "<br><br>" + lines[n].strip()
@@ -140,7 +157,3 @@ mw.form.menuTools.addAction(AI_to_file)
 Transfer_file_to_Notes = QAction("Transfer from file to Notes")
 qconnect(Transfer_file_to_Notes.triggered, write_file_to_notes)
 mw.form.menuTools.addAction(Transfer_file_to_Notes)
-
-Test = QAction("Test file")
-qconnect(Test.triggered, new_file_message)
-mw.form.menuTools.addAction(Test)
