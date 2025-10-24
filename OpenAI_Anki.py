@@ -1,8 +1,10 @@
 import requests
 import json
 import os
+import time
 from aqt import mw, utils
 from aqt.operations import QueryOp
+from aqt.utils import showInfo
 
 
 ADDON_PATH = os.path.dirname(__file__)
@@ -10,6 +12,11 @@ config_file = os.path.join(ADDON_PATH, "config.json")
 if os.path.exists(config_file):
     with open(config_file, "r") as f:
         config = json.load(f)
+
+Notes_info = config.get("Notes_info")
+Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
+AI_response = config.get("AI_response")
+AI_response_path = os.path.join(ADDON_PATH, AI_response)
 
 OPENAI_API_KEY = config.get("OPENAI_API_KEY")
 url = "https://api.openai.com/v1/responses"
@@ -64,12 +71,14 @@ List of words:"""
 
 
 def get_list_of_words():
-    with open(r"C:\Users\Vlad\Desktop\KRN.txt", 'r', encoding='utf-8') as f:
+    with open(Notes_info_path, 'r', encoding='utf-8') as f:
         list_of_words = f.read()
         return list_of_words
 
 
 def ask_ai(list_of_words):
+    start_time = time.time()
+
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json",
@@ -80,6 +89,9 @@ def ask_ai(list_of_words):
     }
 
     response = requests.post(url, headers=headers, json=data)
+    end_time = time.time()
+    time_spent = end_time - start_time
+
     result = response.json()
 
     output = ""
@@ -89,14 +101,18 @@ def ask_ai(list_of_words):
                 if content.get("type") == "output_text":
                     output += content.get("text", "")
 
-    return output
+    return output, time_spent
 
-def on_success(output):
-    with open(r"C:\Users\Vlad\Desktop\KRN2.txt", 'a', encoding='utf-8') as f:
-        # f.seek(0)
-        # f.truncate()
+def on_success(result):
+    output, time_spent = result
+
+    with open(AI_response_path, 'a', encoding='utf-8') as f:
+        f.seek(0)
+        f.truncate()
 
         f.write(f"{output}")
+
+        utils.showInfo(f"✅ AI response written successfully!\n⏱️ Time spent: {time_spent:.2f} seconds")
 
 def on_failure():
     None

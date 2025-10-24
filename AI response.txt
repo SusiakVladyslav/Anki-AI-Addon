@@ -1,0 +1,8 @@
+11  
+저는 매일 학교에 <span style="color: rgb(255, 0, 0);">가다</span>.  
+가다 - to go  
+I <span style="color: rgb(255, 0, 0);">go</span> to school every day.  
+우리는 주말에 공원에 <span style="color: rgb(255, 0, 0);">갈</span> 예정이에요.  
+We plan to <span style="color: rgb(255, 0, 0);">go</span> to the park on the weekend.  
+그는 출근하러 회사에 <span style="color: rgb(255, 0, 0);">갔어요</span>.  
+He <span style="color: rgb(255, 0, 0);">went</span> to the office for work.

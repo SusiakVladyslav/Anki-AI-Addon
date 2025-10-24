@@ -21,6 +21,17 @@ if os.path.exists(config_file):
 
 Tag = config.get("TAG")
 
+Notes_info = config.get("Notes_info")
+Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
+AI_response = config.get("AI_response")
+AI_response_path = os.path.join(ADDON_PATH, AI_response)
+
+
+def new_file_message():
+    with open(AI_response_path, "a", encoding="utf-8") as f:
+        f.write("Hello ai response\n")
+
+
 def strip_html(text):
     """Remove HTML tags and decode HTML entities"""
     if not text:
@@ -51,11 +62,11 @@ def get_field(field,n):
 
 
 def write_notes_to_file():
-    with open(r"C:\Users\Vlad\Desktop\KRN.txt", 'a') as f:
+    with open(Notes_info_path, 'a') as f:
         f.seek(0)
         f.truncate()
 
-        card_ids = get_card_ids(tag="Transfer")
+        card_ids = get_card_ids(tag=Tag)
         for num in range(len(card_ids)):
             number_data = get_field("Number", num)
             f.write(f"{number_data} ")
@@ -67,7 +78,7 @@ def write_notes_to_file():
 
 def write_file_to_notes():
     col = mw.col
-    with open(r"C:\Users\Vlad\Desktop\KRN2.txt", 'r', encoding='utf-8') as f:
+    with open(AI_response_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         card_ids = get_card_ids(tag=Tag)
         card_num = 0  # a count variable for a card in card_ids
@@ -129,3 +140,7 @@ mw.form.menuTools.addAction(AI_to_file)
 Transfer_file_to_Notes = QAction("Transfer from file to Notes")
 qconnect(Transfer_file_to_Notes.triggered, write_file_to_notes)
 mw.form.menuTools.addAction(Transfer_file_to_Notes)
+
+Test = QAction("Test file")
+qconnect(Test.triggered, new_file_message)
+mw.form.menuTools.addAction(Test)
