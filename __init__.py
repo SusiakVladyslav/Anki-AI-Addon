@@ -6,6 +6,7 @@ from aqt import gui_hooks
 from aqt import utils
 import html
 import re
+import json
 
 import sys, os
 ADDON_PATH = os.path.dirname(__file__)
@@ -13,6 +14,12 @@ sys.path.append(os.path.join(ADDON_PATH, "lib"))
 
 from .OpenAI_Anki import write_ai_output_to_file
 
+config_file = os.path.join(ADDON_PATH, "config.json")
+if os.path.exists(config_file):
+    with open(config_file, "r") as f:
+        config = json.load(f)
+
+Tag = config.get("TAG")
 
 def strip_html(text):
     """Remove HTML tags and decode HTML entities"""
@@ -31,31 +38,15 @@ def strip_html(text):
     return clean_text
 
 
-def get_card_ids(tag):
+def get_card_ids(tag=Tag):
     col = mw.col
     card_ids = mw.col.find_cards(f"tag:{tag}")
     return card_ids
 
-
-def get_note_row_number(n):
-    col = mw.col
-    card = mw.col.get_card(get_card_ids(tag="Transfer")[n])
+def get_field(field,n):
+    card = mw.col.get_card(get_card_ids(tag=Tag)[n])
     note = card.note()
-    return note["Number"]
-
-
-def get_note_row_korean(n):
-    col = mw.col
-    card = mw.col.get_card(get_card_ids(tag="Transfer")[n])
-    note = card.note()
-    return strip_html(note["Korean"])
-
-
-def get_note_row_english(n):
-    col = mw.col
-    card = mw.col.get_card(get_card_ids(tag="Transfer")[n])
-    note = card.note()
-    return strip_html(note["English"])
+    return note[field]
 
 
 def write_notes_to_file():
@@ -65,11 +56,11 @@ def write_notes_to_file():
 
         card_ids = get_card_ids(tag="Transfer")
         for num in range(len(card_ids)):
-            number_data = get_note_row_number(num)
+            number_data = get_field("Number", num)
             f.write(f"{number_data} ")
-            korean_data = get_note_row_korean(num)
+            korean_data = get_field("Korean", num)
             f.write(f"{korean_data} - ")
-            english_data = get_note_row_english(num).replace(";", " /// ")
+            english_data = get_field("English", num).replace(";", " /// ")
             f.write(f"{english_data}\n\n")
 
 
@@ -77,7 +68,7 @@ def write_file_to_notes():
     col = mw.col
     with open(r"C:\Users\Vlad\Desktop\KRN2.txt", 'r', encoding='utf-8') as f:
         lines = f.readlines()
-        card_ids = get_card_ids(tag="Test")
+        card_ids = get_card_ids(tag=Tag)
         card_num = 0  # a count variable for a card in card_ids
 
         # line variable
