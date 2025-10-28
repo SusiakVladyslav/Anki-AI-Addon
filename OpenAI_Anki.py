@@ -2,9 +2,12 @@ import requests
 import json
 import os
 import time
+import re
+import html
 from aqt import mw, utils
 from aqt.operations import QueryOp
 from aqt.utils import showInfo
+from aqt.qt import QMessageBox
 
 
 ADDON_PATH = os.path.dirname(__file__)
@@ -18,14 +21,21 @@ Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
 AI_response = config.get("AI_response")
 AI_response_path = os.path.join(ADDON_PATH, AI_response)
 
+if not os.path.exists("Audios"):
+    os.mkdir("Audios")
+
+Audio_path = os.path.join(ADDON_PATH, "Audios")
+
 OPENAI_API_KEY = config.get("OPENAI_API_KEY")
-url = "https://api.openai.com/v1/responses"
+ai_url = "https://api.openai.com/v1/responses"
+tts_url = "https://api.openai.com/v1/audio/speech"
+
+model = config.get("Model")
 
 prompt = """I’m learning Korean. I know around 700 Korean words,
     and I’d like you to create Korean sentences using the words I provide so I can add them to my Anki deck.
 
 Please make sure that each sentence helps me understand the meaning of the word from context.
-Also, you can create several sentences for one word in one row if needed.
 
 The words will be provided in this format:
 "number" "Korean word" - "translation /// translation2 /// ...".
@@ -70,10 +80,42 @@ We’ve almost <span style="color: rgb(255, 0, 0);">run out</span> of fuel."
 List of words:"""
 
 
-def get_list_of_words():
+def strip_html(text):
+    """Remove HTML tags and decode HTML entities"""
+    if not text:
+        return ""
+
+    # First, decode HTML entities like &amp; &lt; &gt;
+    text = html.unescape(text)
+
+    # Remove HTML tags using regex
+    clean_text = re.sub(r'<[^>]+>', '', text)
+
+    # Clean up extra whitespace
+    clean_text = ' '.join(clean_text.split())
+
+    return clean_text
+
+
+def get_full_list_of_words():
     with open(Notes_info_path, 'r', encoding='utf-8') as f:
         list_of_words = f.read()
         return list_of_words
+
+
+def get_korean_words():
+    with open(Notes_info_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        korean_words = []
+
+        for line in lines:
+            if line == "\n":
+                continue
+            else:
+                korean_word = line.split(" - ", 1)[0]
+                korean_words.append(korean_word)
+
+        return korean_words
 
 
 def ask_ai(list_of_words):
@@ -84,11 +126,11 @@ def ask_ai(list_of_words):
         "Content-Type": "application/json",
     }
     data = {
-        "model": "gpt-5-mini",
+        "model": model,
         "input": prompt + list_of_words
     }
 
-    response = requests.post(url, headers=headers, json=data)
+    response = requests.post(ai_url, headers=headers, json=data)
     end_time = time.time()
     time_spent = end_time - start_time
 
@@ -101,21 +143,107 @@ def ask_ai(list_of_words):
                 if content.get("type") == "output_text":
                     output += content.get("text", "")
 
-    return output, time_spent
+    usage = result.get("usage", {})
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
 
-def on_success(result):
-    output, time_spent = result
+    return output, time_spent, input_tokens, output_tokens
+
+
+def on_success_ai(result):
+    output, time_spent, input_tokens, output_tokens = result
 
     with open(AI_response_path, 'a', encoding='utf-8') as f:
         f.seek(0)
         f.truncate()
 
-        f.write(f"{output}")
+        f.write(f"{output}\n\n")
 
-        utils.showInfo(f"✅ AI response written successfully!\n⏱️ Time spent: {time_spent:.2f} seconds")
+        money_spent = ((input_tokens/1000000) * 0,25) + ((output_tokens/1000000) * 2)
+
+        utils.showInfo(f"✅ AI response written successfully!\n"
+                       f"⏱️ Time spent: {time_spent:.2f} seconds\n"
+                       f"Input tokens used: {input_tokens}\n"
+                       f"Output tokens used: {output_tokens}"
+                       f"Money spent {money_spent}$ (gpt-5-mini)")
+
+
+def ask_tts():
+    start_time = time.time()
+
+    with open(AI_response_path, "r", encoding='utf-8') as AI_file:
+        output = AI_file.read()
+
+    list_of_words = get_korean_words()
+
+    lines = output.split("\n")
+    responses = {}
+    pattern = re.compile(r"^[가-힣\s]+ - [A-Za-z\s,/()-;<>]+$")
+    n = 0
+    s = 0
+    text = ""
+
+    for line in lines:
+        line = strip_html(line)
+        if re.search(r'[\uac00-\ud7a3]', line) and not pattern.match(line):
+            text = line
+            s += 1
+        elif line == "":
+            n += 1
+            s = 0
+            continue
+        else:
+            continue
+
+        if n >= len(list_of_words):
+            break
+
+        word = list_of_words[n].split(" - ")[0]
+
+        payload = {
+            "model": "gpt-4o-mini-tts",
+            "input": text,
+            "voice": "echo",
+            "format": "mp3"
+        }
+
+        # Request headers
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        # Send the request
+        response = requests.post(tts_url, headers=headers, json=payload)
+
+
+
+        if response.status_code == 200:
+            responses[word + " " + str(s)] = response.content
+        else:
+            with open("error_log.txt", 'a', encoding='utf-8') as f:
+                f.write("Error:" + str(response.status_code) + "\n")
+                f.write(response.text)
+
+    end_time = time.time()
+    time_spent = end_time - start_time
+
+    return responses, time_spent
+
+
+def on_success_tts(result):
+    audios, time_spent = result
+    for audio in audios:
+        file_path = os.path.join(Audio_path, audio + ".mp3")
+        with open(file_path, "wb") as f:
+            f.write(audios[audio])
+
+    utils.showInfo(f"✅ {str(len(audios))} Audios was successfully generated\n"
+                   f"⏱️ Time spent: {time_spent:.2f} seconds")
 
 def on_failure():
     None
+
 
 # function that allows to make a request to API without freezing Anki
 # on_success is called with the return value of ask_ai
@@ -124,11 +252,35 @@ def write_ai_output_to_file():
     Main function to call - makes a request to OpenAI API and writes output in a file.
     """
 
-    # Create the background operation
+    msg = QMessageBox(mw)
+    msg.setIcon(QMessageBox.Question)
+    msg.setWindowTitle("Confirmation regarding AI model")
+    msg.setText(f"The used model is {model}.\n Do you want to continue?")
+    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    result = msg.exec()
+
+    if result == QMessageBox.Yes:
+
+        # Create the background operation
+        op = QueryOp(
+            parent=mw,
+            op=lambda col: ask_ai(get_full_list_of_words()),  # Runs in background
+            success=on_success_ai  # Called when done
+        )
+
+        # To be added
+        # Handle failure
+        # op.failure(on_failure)
+
+        # Show progress dialog and run in background
+        op.with_progress("AI is generating sentences...").run_in_background()
+
+
+def generate_audios():
     op = QueryOp(
         parent=mw,
-        op=lambda col: ask_ai(get_list_of_words()),  # Runs in background
-        success=on_success  # Called when done
+        op=lambda col: ask_tts(),  # Runs in background
+        success=on_success_tts  # Called when done
     )
 
     # To be added
@@ -136,4 +288,5 @@ def write_ai_output_to_file():
     # op.failure(on_failure)
 
     # Show progress dialog and run in background
-    op.with_progress("AI is generating sentences...").run_in_background()
+    op.with_progress("AI is generating audios...").run_in_background()
+
