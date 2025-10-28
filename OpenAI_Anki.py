@@ -3,6 +3,7 @@ import json
 import os
 import time
 import re
+import html
 from aqt import mw, utils
 from aqt.operations import QueryOp
 from aqt.utils import showInfo
@@ -71,6 +72,23 @@ We’ve almost <span style="color: rgb(255, 0, 0);">run out</span> of fuel."
 List of words:"""
 
 
+def strip_html(text):
+    """Remove HTML tags and decode HTML entities"""
+    if not text:
+        return ""
+
+    # First, decode HTML entities like &amp; &lt; &gt;
+    text = html.unescape(text)
+
+    # Remove HTML tags using regex
+    clean_text = re.sub(r'<[^>]+>', '', text)
+
+    # Clean up extra whitespace
+    clean_text = ' '.join(clean_text.split())
+
+    return clean_text
+
+
 def get_full_list_of_words():
     with open(Notes_info_path, 'r', encoding='utf-8') as f:
         list_of_words = f.read()
@@ -124,18 +142,36 @@ def ask_ai(list_of_words):
     return output, time_spent, input_tokens, output_tokens
 
 
-def ask_tts(output):
+def on_success_ai(result):
+    output, time_spent, input_tokens, output_tokens = result
+
+    with open(AI_response_path, 'a', encoding='utf-8') as f:
+        f.seek(0)
+        f.truncate()
+
+        f.write(f"{output}")
+
+        utils.showInfo(f"✅ AI response written successfully!\n"
+                       f"⏱️ Time spent: {time_spent:.2f} seconds\n"
+                       f"Input tokens used: {input_tokens}\n"
+                       f"Output tokens used: {output_tokens}")
+
+
+def ask_tts():
+    with open(AI_response_path, "r", encoding='utf-8') as AI_file:
+        output = AI_file.read()
 
     list_of_words = get_korean_words()
 
     lines = output.split("\n")
     responses = {}
-    pattern = re.compile(r"^[가-힣\s]+ - [A-Za-z\s,/]+$")
+    pattern = re.compile(r"^[가-힣\s]+ - [A-Za-z\s,/()-;<>]+$")
     n = 0
     s = 0
     text = ""
 
     for line in lines:
+        line = strip_html(line)
         if re.search(r'[\uac00-\ud7a3]', line) and not pattern.match(line):
             text = line
             s += 1
@@ -177,29 +213,16 @@ def ask_tts(output):
     return responses
 
 
-def on_success(result):
-    result1, result2 = result
-    output, time_spent, input_tokens, output_tokens = result1
-    audios = result2
-
-    with open(AI_response_path, 'a', encoding='utf-8') as f:
-        f.seek(0)
-        f.truncate()
-
-        f.write(f"{output}")
-
-        for audio in audios:
-            with open(audio + ".mp3", "wb") as f:
-                f.write(audios[audio])
-
-        utils.showInfo(f"✅ AI response written successfully!\n"
-                       f"⏱️ Time spent: {time_spent:.2f} seconds\n"
-                       f"Input tokens used: {input_tokens}\n"
-                       f"Output tokens used: {output_tokens}")
+def on_success_tts(result):
+    audios = result
+    for audio in audios:
+        with open(audio + ".mp3", "wb") as f:
+            f.write(audios[audio])
 
 
 def on_failure():
     None
+
 
 # function that allows to make a request to API without freezing Anki
 # on_success is called with the return value of ask_ai
@@ -208,17 +231,11 @@ def write_ai_output_to_file():
     Main function to call - makes a request to OpenAI API and writes output in a file.
     """
 
-    def run_ais():
-        result1 = ask_ai(get_full_list_of_words())
-        result2 = ask_tts(result1[0])
-
-        return result1, result2
-
     # Create the background operation
     op = QueryOp(
         parent=mw,
-        op=lambda col: run_ais(),  # Runs in background
-        success=on_success  # Called when done
+        op=lambda col: ask_ai(get_full_list_of_words()),  # Runs in background
+        success=on_success_ai  # Called when done
     )
 
     # To be added
@@ -229,9 +246,16 @@ def write_ai_output_to_file():
     op.with_progress("AI is generating sentences...").run_in_background()
 
 
-def main():
-    print(get_korean_words())
+def generate_audios():
+    op = QueryOp(
+        parent=mw,
+        op=lambda col: ask_tts(),  # Runs in background
+        success=on_success_tts  # Called when done
+    )
 
+    # To be added
+    # Handle failure
+    # op.failure(on_failure)
 
-if __name__:
-    main()
+    # Show progress dialog and run in background
+    op.with_progress("AI is generating audios...").run_in_background()

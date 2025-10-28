@@ -12,7 +12,7 @@ import sys, os
 ADDON_PATH = os.path.dirname(__file__)
 sys.path.append(os.path.join(ADDON_PATH, "lib"))
 
-from .OpenAI_Anki import write_ai_output_to_file
+from .OpenAI_Anki import write_ai_output_to_file, generate_audios
 
 config_file = os.path.join(ADDON_PATH, "config.json")
 if os.path.exists(config_file):
@@ -152,6 +152,10 @@ mw.form.menuTools.addAction(Transfer_Notes_to_file)
 AI_to_file = QAction("Ask AI to write to the file")
 qconnect(AI_to_file.triggered, write_ai_output_to_file)
 mw.form.menuTools.addAction(AI_to_file)
+
+TTS_audios = QAction("Ask AI to generate audios")
+qconnect(TTS_audios.triggered, generate_audios)
+mw.form.menuTools.addAction(TTS_audios)
 
 Transfer_file_to_Notes = QAction("Transfer from file to Notes")
 qconnect(Transfer_file_to_Notes.triggered, write_file_to_notes)
