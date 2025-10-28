@@ -111,7 +111,7 @@ def add_audio_to_note(files, card_ids, card_num):
 
     for file in files:
         audio_tag = col.media.add_file(file)
-        note["Audio"] += f"[{audio_tag}]"
+        note["Audio"] += f"[sound:{audio_tag}]"
         col.update_note(note)
 
 
@@ -184,20 +184,22 @@ def write_file_to_notes():
                 continue
 
 
+my_menu = QMenu("My add-on", mw)
+mw.form.menubar.addMenu(my_menu)
 
 
-Transfer_Notes_to_file = QAction("Transfer Notes to file")
+Transfer_Notes_to_file = QAction("📥 Copy Note's fields to file")
 qconnect(Transfer_Notes_to_file.triggered, write_notes_to_file)
-mw.form.menuTools.addAction(Transfer_Notes_to_file)
+my_menu.addAction(Transfer_Notes_to_file)
 
-AI_to_file = QAction("Ask AI to write to the file")
+AI_to_file = QAction("🤖 Ask AI to generate sentences")
 qconnect(AI_to_file.triggered, write_ai_output_to_file)
-mw.form.menuTools.addAction(AI_to_file)
+my_menu.addAction(AI_to_file)
 
-TTS_audios = QAction("Ask AI to generate audios")
+TTS_audios = QAction("🔊 Ask AI to generate audios")
 qconnect(TTS_audios.triggered, generate_audios)
-mw.form.menuTools.addAction(TTS_audios)
+my_menu.addAction(TTS_audios)
 
-Transfer_file_to_Notes = QAction("Transfer from file to Notes")
+Transfer_file_to_Notes = QAction("📤 Transfer sentences and audio to Notes")
 qconnect(Transfer_file_to_Notes.triggered, write_file_to_notes)
-mw.form.menuTools.addAction(Transfer_file_to_Notes)
+my_menu.addAction(Transfer_file_to_Notes)

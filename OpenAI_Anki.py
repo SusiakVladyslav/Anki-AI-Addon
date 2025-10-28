@@ -7,6 +7,7 @@ import html
 from aqt import mw, utils
 from aqt.operations import QueryOp
 from aqt.utils import showInfo
+from aqt.qt import QMessageBox
 
 
 ADDON_PATH = os.path.dirname(__file__)
@@ -28,6 +29,8 @@ Audio_path = os.path.join(ADDON_PATH, "Audios")
 OPENAI_API_KEY = config.get("OPENAI_API_KEY")
 ai_url = "https://api.openai.com/v1/responses"
 tts_url = "https://api.openai.com/v1/audio/speech"
+
+model = config.get("Model")
 
 prompt = """I’m learning Korean. I know around 700 Korean words,
     and I’d like you to create Korean sentences using the words I provide so I can add them to my Anki deck.
@@ -123,7 +126,7 @@ def ask_ai(list_of_words):
         "Content-Type": "application/json",
     }
     data = {
-        "model": "gpt-5-mini",
+        "model": model,
         "input": prompt + list_of_words
     }
 
@@ -156,13 +159,18 @@ def on_success_ai(result):
 
         f.write(f"{output}\n\n")
 
+        money_spent = ((input_tokens/1000000) * 0,25) + ((output_tokens/1000000) * 2)
+
         utils.showInfo(f"✅ AI response written successfully!\n"
                        f"⏱️ Time spent: {time_spent:.2f} seconds\n"
                        f"Input tokens used: {input_tokens}\n"
-                       f"Output tokens used: {output_tokens}")
+                       f"Output tokens used: {output_tokens}"
+                       f"Money spent {money_spent}$ (gpt-5-mini)")
 
 
 def ask_tts():
+    start_time = time.time()
+
     with open(AI_response_path, "r", encoding='utf-8') as AI_file:
         output = AI_file.read()
 
@@ -208,6 +216,8 @@ def ask_tts():
         # Send the request
         response = requests.post(tts_url, headers=headers, json=payload)
 
+
+
         if response.status_code == 200:
             responses[word + " " + str(s)] = response.content
         else:
@@ -215,16 +225,21 @@ def ask_tts():
                 f.write("Error:" + str(response.status_code) + "\n")
                 f.write(response.text)
 
-    return responses
+    end_time = time.time()
+    time_spent = end_time - start_time
+
+    return responses, time_spent
 
 
 def on_success_tts(result):
-    audios = result
+    audios, time_spent = result
     for audio in audios:
         file_path = os.path.join(Audio_path, audio + ".mp3")
         with open(file_path, "wb") as f:
             f.write(audios[audio])
 
+    utils.showInfo(f"✅ {str(len(audios))} Audios was successfully generated\n"
+                   f"⏱️ Time spent: {time_spent:.2f} seconds")
 
 def on_failure():
     None
@@ -237,19 +252,28 @@ def write_ai_output_to_file():
     Main function to call - makes a request to OpenAI API and writes output in a file.
     """
 
-    # Create the background operation
-    op = QueryOp(
-        parent=mw,
-        op=lambda col: ask_ai(get_full_list_of_words()),  # Runs in background
-        success=on_success_ai  # Called when done
-    )
+    msg = QMessageBox(mw)
+    msg.setIcon(QMessageBox.Question)
+    msg.setWindowTitle("Confirmation regarding AI model")
+    msg.setText(f"The used model is {model}.\n Do you want to continue?")
+    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    result = msg.exec()
 
-    # To be added
-    # Handle failure
-    # op.failure(on_failure)
+    if result == QMessageBox.Yes:
 
-    # Show progress dialog and run in background
-    op.with_progress("AI is generating sentences...").run_in_background()
+        # Create the background operation
+        op = QueryOp(
+            parent=mw,
+            op=lambda col: ask_ai(get_full_list_of_words()),  # Runs in background
+            success=on_success_ai  # Called when done
+        )
+
+        # To be added
+        # Handle failure
+        # op.failure(on_failure)
+
+        # Show progress dialog and run in background
+        op.with_progress("AI is generating sentences...").run_in_background()
 
 
 def generate_audios():
@@ -265,3 +289,4 @@ def generate_audios():
 
     # Show progress dialog and run in background
     op.with_progress("AI is generating audios...").run_in_background()
+
