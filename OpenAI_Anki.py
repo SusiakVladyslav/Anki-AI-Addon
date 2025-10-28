@@ -154,7 +154,7 @@ def on_success_ai(result):
         f.seek(0)
         f.truncate()
 
-        f.write(f"{output}")
+        f.write(f"{output}\n\n")
 
         utils.showInfo(f"✅ AI response written successfully!\n"
                        f"⏱️ Time spent: {time_spent:.2f} seconds\n"
