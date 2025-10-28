@@ -20,6 +20,11 @@ Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
 AI_response = config.get("AI_response")
 AI_response_path = os.path.join(ADDON_PATH, AI_response)
 
+if not os.path.exists("Audios"):
+    os.mkdir("Audios")
+
+Audio_path = os.path.join(ADDON_PATH, "Audios")
+
 OPENAI_API_KEY = config.get("OPENAI_API_KEY")
 ai_url = "https://api.openai.com/v1/responses"
 tts_url = "https://api.openai.com/v1/audio/speech"
@@ -216,7 +221,8 @@ def ask_tts():
 def on_success_tts(result):
     audios = result
     for audio in audios:
-        with open(audio + ".mp3", "wb") as f:
+        file_path = os.path.join(Audio_path, audio + ".mp3")
+        with open(file_path, "wb") as f:
             f.write(audios[audio])
 
 
