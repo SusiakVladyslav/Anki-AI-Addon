@@ -16,7 +16,7 @@ from .OpenAI_Anki import write_ai_output_to_file, generate_audios
 
 config_file = os.path.join(ADDON_PATH, "config.json")
 if os.path.exists(config_file):
-    with open(config_file, "r") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
 
 Tag = config.get("TAG")
@@ -58,7 +58,7 @@ def get_field(field, n):
 
 
 def write_notes_to_file():
-    with open(Notes_info_path, 'a') as f:
+    with open(Notes_info_path, 'a', encoding="utf-8") as f:
         f.seek(0)
         f.truncate()
 

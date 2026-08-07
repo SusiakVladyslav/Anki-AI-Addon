@@ -6,7 +6,6 @@ import re
 import html
 from aqt import mw, utils
 from aqt.operations import QueryOp
-from aqt.utils import showInfo
 from aqt.qt import QMessageBox
 
 
@@ -32,7 +31,7 @@ tts_url = "https://api.openai.com/v1/audio/speech"
 
 model = config.get("Model")
 
-prompt = """I’m learning Korean. I know around 700 Korean words,
+prompt = """I’m learning Korean,
     and I’d like you to create Korean sentences using the words I provide so I can add them to my Anki deck.
 
 Please make sure that each sentence helps me understand the meaning of the word from context.
@@ -43,12 +42,9 @@ Some words have more than 1 translation. Please take into account, different tra
 If a word divided by comma it is still only one translation and I need only one sentence.
 
 Instructions:
-For each korean word, generate one sentence per translation.
-You should wrap both the Korean word and its translation in the following HTML span tag for coloring:
-<span style="color: rgb(255, 0, 0);">WORD</span>
 Important!:
-If a translation contains a comma (,), treat it as part of the same translation and generate only one sentence for it.
-Only generate multiple sentences if the translations are separated by ///.
+If a translation contains a comma (,), treat it as part of the same translation and generate only one translation for it.
+Only generate multiple translations if the translations are separated by ///.
 
 
 Output in plain text using this format:
@@ -66,16 +62,16 @@ Example:
 List of words: "606 글쎄 - well, let me see, 913 떨어지다 - to fall, crash /// to be short of, run out"
 Expected output:
 "606
-<span style="color: rgb(255, 0, 0);">글쎄</span>, 저는 잘 모르겠어요..
+글쎄, 저는 잘 모르겠어요..
 글쎄 - well, let me see
-<span style="color: rgb(255, 0, 0);">Well</span>, I’m not sure..
+Well, I’m not sure..
 
 913
-사과가 나무에서 <span style="color: rgb(255, 0, 0);">떨어졌어요</span>.
+사과가 나무에서 떨어졌어요
 떨어지다 - to fall, crash /// to be short of, run out
-The apple <span style="color: rgb(255, 0, 0);">fell</span> from the tree.
-기름이 거의 다 <span style="color: rgb(255, 0, 0);">떨어졌어요</span>.
-We’ve almost <span style="color: rgb(255, 0, 0);">run out</span> of fuel."
+The apple fell from the tree.
+기름이 거의 다 떨어졌어요
+We’ve almost run out of fuel."
 
 List of words:"""
 
@@ -159,13 +155,27 @@ def on_success_ai(result):
 
         f.write(f"{output}\n\n")
 
-        money_spent = ((input_tokens/1000000) * 0,25) + ((output_tokens/1000000) * 2)
+        models_input_price = {
+            "gpt-5.2": 1.75,
+            "gpt-5.1": 1.25,
+            "gpt-5": 1.25,
+            "gpt-5-mini": 0.25
+        }
+
+        models_output_price = {
+            "gpt-5.2": 14,
+            "gpt-5.1": 10,
+            "gpt-5": 10,
+            "gpt-5-mini": 2
+        }
+
+        money_spent = ((input_tokens/1_000_000) * models_input_price[model]) + ((output_tokens/1_000_000) * models_output_price[model])
 
         utils.showInfo(f"✅ AI response written successfully!\n"
                        f"⏱️ Time spent: {time_spent:.2f} seconds\n"
                        f"Input tokens used: {input_tokens}\n"
-                       f"Output tokens used: {output_tokens}"
-                       f"Money spent {money_spent}$ (gpt-5-mini)")
+                       f"Output tokens used: {output_tokens}\n"
+                       f"Money spent {round(money_spent, 4)}$ ({model})")
 
 
 def ask_tts():
@@ -241,8 +251,9 @@ def on_success_tts(result):
     utils.showInfo(f"✅ {str(len(audios))} Audios was successfully generated\n"
                    f"⏱️ Time spent: {time_spent:.2f} seconds")
 
+
 def on_failure():
-    None
+    pass
 
 
 # function that allows to make a request to API without freezing Anki
@@ -253,13 +264,15 @@ def write_ai_output_to_file():
     """
 
     msg = QMessageBox(mw)
-    msg.setIcon(QMessageBox.Question)
+    msg.setIcon(QMessageBox.Icon.Question)
     msg.setWindowTitle("Confirmation regarding AI model")
     msg.setText(f"The used model is {model}.\n Do you want to continue?")
-    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    msg.setStandardButtons(
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+    )
     result = msg.exec()
 
-    if result == QMessageBox.Yes:
+    if result == QMessageBox.StandardButton.Yes:
 
         # Create the background operation
         op = QueryOp(
