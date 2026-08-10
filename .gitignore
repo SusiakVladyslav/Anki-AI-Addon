@@ -9,3 +9,14 @@ AI response.txt
 __pycache__/
 
 Audios/
+
+!/debug info
+
+!/response_example.json
+
+!/meta.json
+
+!/.env
+
+!/tests/
+

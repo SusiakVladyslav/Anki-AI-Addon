@@ -1,5 +1,5 @@
 import pytest
-import OpenAI_Anki
+from ai import OpenAI_Anki
 
 
 @pytest.mark.parametrize("html_text, text_without_html", [

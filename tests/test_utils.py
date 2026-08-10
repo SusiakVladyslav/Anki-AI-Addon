@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-import utils
+from utils import utils
 
 from anki.collection import Collection
 

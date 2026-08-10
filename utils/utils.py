@@ -1,27 +1,14 @@
 from aqt import mw
 import html
-import json
 import re
-
 from aqt import utils
 from aqt.qt import *
+from aqt.browser import Browser
+from aqt.utils import showInfo
 
-ADDON_PATH = os.path.dirname(__file__)
-sys.path.append(os.path.join(ADDON_PATH, "lib"))
-
-config_file = os.path.join(ADDON_PATH, "config.json")
-if os.path.exists(config_file):
-    with open(config_file, "r") as f:
-        config = json.load(f)
-
-Tag = config.get("TAG")
-
-Notes_info = config.get("Notes_info")
-Notes_info_path = os.path.join(ADDON_PATH, Notes_info)
-AI_response = config.get("AI_response")
-AI_response_path = os.path.join(ADDON_PATH, AI_response)
-Save_file_path = os.path.join(ADDON_PATH, "Save file.txt")
-Audio_path = os.path.join(ADDON_PATH, "Audios")
+from utils.constants import TAG, NOTES_INFO_PATH, AI_RESPONSE_PATH, AUDIO_PATH, SAVE_FILE_PATH
+import gui.gui as my_gui
+import gui.dialogs as dialogs
 
 
 def strip_html(text):
@@ -41,23 +28,23 @@ def strip_html(text):
     return clean_text
 
 
-def get_card_ids(tag=Tag):
+def get_card_ids(tag=TAG):
     card_ids = mw.col.find_cards(f"tag:{tag}")
     return card_ids
 
 
 def get_field(field, n):
-    card = mw.col.get_card(get_card_ids(tag=Tag)[n])
+    card = mw.col.get_card(get_card_ids(tag=TAG)[n])
     note = card.note()
     return strip_html(note[field])
 
 
 def write_notes_to_file():
-    with open(Notes_info_path, 'a', encoding="utf-8") as f:
+    with open(NOTES_INFO_PATH, 'a', encoding="utf-8") as f:
         f.seek(0)
         f.truncate()
 
-        card_ids = get_card_ids(tag=Tag)
+        card_ids = get_card_ids(tag=TAG)
         for num in range(len(card_ids)):
             number_data = get_field("Number", num)
             f.write(f"{number_data} ")
@@ -69,10 +56,10 @@ def write_notes_to_file():
 
 def create_save_file():
     utils.showWarning("The number of Note and current number is not the same.\nCreating a save file")
-    with open(Save_file_path, 'a', encoding='utf-8') as save_file:
-        with open(Notes_info_path, "r", encoding='utf-8') as notes_file:
+    with open(SAVE_FILE_PATH, 'a', encoding='utf-8') as save_file:
+        with open(NOTES_INFO_PATH, "r", encoding='utf-8') as notes_file:
             notes = notes_file.readlines()
-        with open(AI_response_path, "r", encoding='utf-8') as AI_file:
+        with open(AI_RESPONSE_PATH, "r", encoding='utf-8') as AI_file:
             AI = AI_file.readlines()
 
         save_file.writelines(notes)
@@ -112,9 +99,9 @@ def add_audio_to_note(files, card_ids, card_num):
 
 def write_file_to_notes():
     col = mw.col
-    with open(AI_response_path, 'r', encoding='utf-8') as f:
+    with open(AI_RESPONSE_PATH, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-        card_ids = get_card_ids(tag=Tag)
+        card_ids = get_card_ids(tag=TAG)
         card_num = 0  # a count variable for a card in card_ids
 
         # line variable
@@ -140,7 +127,7 @@ def write_file_to_notes():
 
             # A check whether a line is empty
             elif lines[n] == "\n":
-                add_audio_to_note(get_all_files_by_number(Audio_path, Number), card_ids, card_num)
+                add_audio_to_note(get_all_files_by_number(AUDIO_PATH, Number), card_ids, card_num)
 
                 n += 1
                 is_a_new_word = True
@@ -177,3 +164,39 @@ def write_file_to_notes():
 
                 n += 2
                 continue
+
+
+def extract_field_data(browser: Browser):
+    selected_note_ids = browser.selected_notes()
+
+    if len(selected_note_ids) == 0:
+        dialogs.no_cards_were_selected_warning()
+
+    if more_than_one_note_type_selected(selected_note_ids):
+        dialogs.more_than_one_note_type_selected_warning()
+
+    note_type = mw.col.get_note(selected_note_ids[0]).note_type()["name"]
+
+    list_of_notes_fields_data = []
+    for note_id in selected_note_ids:
+        note = mw.col.get_note(note_id)
+        list_of_notes_fields_data.append(note.items())
+    
+    return list_of_notes_fields_data
+
+    # if note_type_not_in_profile():
+    #     print("Unkown note_type")
+    #
+    # prompt = config_get_prompt_for_note_type(note_type)
+
+
+def more_than_one_note_type_selected(selected_note_ids):
+    set_of_note_types = set()
+    for note_id in selected_note_ids:
+        note = mw.col.get_note(note_id)
+        set_of_note_types.add(note.note_type()["name"])
+
+    if len(set_of_note_types) > 1:
+        return True
+    else:
+        return False
