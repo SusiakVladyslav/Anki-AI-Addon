@@ -156,6 +156,7 @@ def on_success_ai(result):
         f.write(f"{output}\n\n")
 
         models_input_price = {
+            "gpt-5.4": 1.25,
             "gpt-5.2": 1.75,
             "gpt-5.1": 1.25,
             "gpt-5": 1.25,
@@ -163,6 +164,7 @@ def on_success_ai(result):
         }
 
         models_output_price = {
+            "gpt-5.4": 7.50,
             "gpt-5.2": 14,
             "gpt-5.1": 10,
             "gpt-5": 10,
