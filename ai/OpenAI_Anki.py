@@ -2,30 +2,18 @@ import requests
 import os
 import time
 import re
-import html
+
 from aqt import mw, utils
 from aqt.operations import QueryOp
 from aqt.utils import showInfo
 from aqt.qt import QMessageBox
 
+from anki.notes import Note
+
 from utils.constants import NOTES_INFO_PATH, OPENAI_API_KEY, AI_RESPONSE_PATH, MODEL, PROMPT, AI_URL, AUDIO_PATH, TTS_URL
+from utils.utils import strip_html
 
-
-def strip_html(text):
-    """Remove HTML tags and decode HTML entities"""
-    if not text:
-        return ""
-
-    # First, decode HTML entities like &amp; &lt; &gt;
-    text = html.unescape(text)
-
-    # Remove HTML tags using regex
-    clean_text = re.sub(r'<[^>]+>', '', text)
-
-    # Clean up extra whitespace
-    clean_text = ' '.join(clean_text.split())
-
-    return clean_text
+from ai.openai_requests import request_something
 
 
 def get_full_list_of_words():
@@ -47,38 +35,6 @@ def get_korean_words():
                 korean_words.append(korean_word)
 
         return korean_words
-
-
-def ask_ai(list_of_words):
-    start_time = time.time()
-
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    data = {
-        "model": MODEL,
-        "input": PROMPT + list_of_words
-    }
-
-    response = requests.post(AI_URL, headers=headers, json=data)
-    end_time = time.time()
-    time_spent = end_time - start_time
-
-    result = response.json()
-
-    output = ""
-    for item in result.get("output", []):
-        if item.get("type") == "message":
-            for content in item.get("content", []):
-                if content.get("type") == "output_text":
-                    output += content.get("text", "")
-
-    usage = result.get("usage", {})
-    input_tokens = usage.get("input_tokens", 0)
-    output_tokens = usage.get("output_tokens", 0)
-
-    return output, time_spent, input_tokens, output_tokens
 
 
 def on_success_ai(result):
@@ -190,7 +146,7 @@ def write_ai_output_to_file():
         # Create the background operation
         op = QueryOp(
             parent=mw,
-            op=lambda col: ask_ai(get_full_list_of_words()),  # Runs in background
+            op=lambda col: request_something(get_full_list_of_words()),  # Runs in background
             success=on_success_ai  # Called when done
         )
 
@@ -216,3 +172,26 @@ def generate_audios():
     # Show progress dialog and run in background
     op.with_progress("AI is generating audios...").run_in_background()
 
+
+def make_ai_request(selected_notes: list[Note], prompt: str):
+    all_notes_fields_str = get_notes_fields_as_string(selected_notes)
+
+    start_time = time.time()
+    output_text, input_tokens, output_tokens, cache_input_tokens = request_something(all_notes_fields_str, prompt=prompt)
+    time_spent = time.time() - start_time
+    showInfo(all_notes_fields_str)
+    showInfo(f"{output_text}\n/// {input_tokens} /// {output_tokens} /// {time_spent} /// {MODEL} /// {cache_input_tokens}")
+
+    return output_text, input_tokens, output_tokens
+
+
+def get_notes_fields_as_string(selected_notes: list[Note]) -> str:
+    all_notes_fields_str = ""
+    for note in selected_notes:
+        fields_data: list[tuple[str, str]] = note.items()
+        for field_name, field_value in fields_data:
+            all_notes_fields_str += f"{field_name}|{field_value}\n"
+
+    return all_notes_fields_str
+
+# [<anki.notes.Note object at 0x0000022E6B246A50>, <anki.notes.Note object at 0x0000022E6B206A40>]

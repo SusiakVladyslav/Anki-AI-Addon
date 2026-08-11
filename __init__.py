@@ -2,7 +2,7 @@ from aqt import gui_hooks
 from aqt.qt import QMenu, QAction, qconnect
 
 from ai.OpenAI_Anki import write_ai_output_to_file, generate_audios
-from utils.utils import write_notes_to_file, write_file_to_notes, extract_field_data
+from utils.utils import write_notes_to_file, write_file_to_notes, change_the_notes
 from gui.gui import on_browser_context_menu, on_browser_context_menu_card_menu
 
 
@@ -35,7 +35,7 @@ def setup_browser_menu(browser):
 
     action = QAction("Test func", browser)
     # Use lambda _=False or ignore signal arguments explicitly:
-    qconnect(action.triggered, lambda _=False: extract_field_data(browser))
+    qconnect(action.triggered, lambda _=False: change_the_notes(browser))
     my_menu.addAction(action)
 
 

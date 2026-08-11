@@ -1,14 +1,17 @@
-from aqt import mw
 import html
 import re
-from aqt import utils
+
+from aqt import mw, utils
 from aqt.qt import *
 from aqt.browser import Browser
 from aqt.utils import showInfo
 
-from utils.constants import TAG, NOTES_INFO_PATH, AI_RESPONSE_PATH, AUDIO_PATH, SAVE_FILE_PATH
+from anki.notes import Note
+
+from utils.constants import TAG, NOTES_INFO_PATH, AI_RESPONSE_PATH, AUDIO_PATH, SAVE_FILE_PATH, PROMPT
 import gui.gui as my_gui
 import gui.dialogs as dialogs
+import ai.OpenAI_Anki as open_ai
 
 
 def strip_html(text):
@@ -166,35 +169,36 @@ def write_file_to_notes():
                 continue
 
 
-def extract_field_data(browser: Browser):
+def change_the_notes(browser: Browser) -> None:
+    selected_notes = get_selected_notes(browser)
+
+    if selected_notes is None:
+        return
+
+    type_of_notes = selected_notes[0].note_type()["name"]
+
+    output_text, input_tokens, output_tokens = open_ai.make_ai_request(selected_notes, prompt=PROMPT)
+
+    # ingest_output_text(output_text)
+
+
+def get_selected_notes(browser: Browser) -> list[Note] | None:
     selected_note_ids = browser.selected_notes()
+    selected_notes = [mw.col.get_note(note_id) for note_id in selected_note_ids]
 
-    if len(selected_note_ids) == 0:
+    if len(selected_notes) == 0:
         dialogs.no_cards_were_selected_warning()
+        return
 
-    if more_than_one_note_type_selected(selected_note_ids):
+    if more_than_one_note_type_selected(selected_notes):
         dialogs.more_than_one_note_type_selected_warning()
+        return
 
-    note_type = mw.col.get_note(selected_note_ids[0]).note_type()["name"]
-
-    list_of_notes_fields_data = []
-    for note_id in selected_note_ids:
-        note = mw.col.get_note(note_id)
-        list_of_notes_fields_data.append(note.items())
-    
-    return list_of_notes_fields_data
-
-    # if note_type_not_in_profile():
-    #     print("Unkown note_type")
-    #
-    # prompt = config_get_prompt_for_note_type(note_type)
+    return selected_notes
 
 
-def more_than_one_note_type_selected(selected_note_ids):
-    set_of_note_types = set()
-    for note_id in selected_note_ids:
-        note = mw.col.get_note(note_id)
-        set_of_note_types.add(note.note_type()["name"])
+def more_than_one_note_type_selected(selected_notes: list[Note]) -> bool:
+    set_of_note_types = set(note.note_type()["name"] for note in selected_notes)
 
     if len(set_of_note_types) > 1:
         return True
