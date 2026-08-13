@@ -190,6 +190,8 @@ def get_notes_fields_as_string(selected_notes: list[Note]) -> str:
     for note in selected_notes:
         fields_data: list[tuple[str, str]] = note.items()
         for field_name, field_value in fields_data:
+            if field_name == "Audio" or field_name == "Number" or field_name == "Hanja":
+                continue
             all_notes_fields_str += f"{field_name}|{field_value}\n"
 
     return all_notes_fields_str

@@ -2,7 +2,7 @@ import requests
 from utils.constants import OPENAI_API_KEY, MODEL, PROMPT, AI_URL
 
 
-def request_something(list_of_words: str = "", prompt: str = PROMPT) -> tuple[str, int, int]:
+def request_something(list_of_words: str = "", prompt: str = PROMPT) -> tuple[str, int, int, int]:
     result = fetch_response(list_of_words, prompt)
 
     output_text = result["output"][0]["content"][0]["text"]
