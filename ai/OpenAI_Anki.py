@@ -11,7 +11,7 @@ from aqt.qt import QMessageBox
 from anki.notes import Note
 
 from utils.constants import NOTES_INFO_PATH, OPENAI_API_KEY, AI_RESPONSE_PATH, MODEL, PROMPT, AI_URL, AUDIO_PATH, TTS_URL
-from utils.utils import strip_html
+from utils.func_utils import strip_html
 
 from ai.openai_requests import request_something
 

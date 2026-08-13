@@ -1,6 +1,6 @@
 import html
 import re
-from itertools import batched
+import itertools
 
 from aqt import mw, utils
 from aqt.qt import *
@@ -208,12 +208,23 @@ def more_than_one_note_type_selected(selected_notes: list[Note]) -> bool:
 
 
 def ingest_output_text(output_text: str):
-    for n, line in enumerate(output_text.splitlines(), start=1):
-        if n % 3 == 1:
-            # line is korean
-        elif n % 3 == 2:
-            # line is korean and engl
-        else:
-            # line is english
+    lines = [line.strip() for line in output_text.splitlines() if line.strip()]
+    entries = []
+
+    for kor, vocab, eng in itertools.batched(lines, 3):
+        print("hi")
+
+    # for kor, vocab in itertools.batched(output_text, n=3):
+    #     print("hi")
+
+    # for n, line in enumerate(output_text.splitlines(), start=1):
+    #     if n % 3 == 1:
+    #         # line is korean
+    #     elif n % 3 == 2:
+    #         # line is korean and engl
+    #     else:
+    #         # line is english
 
 
+if __name__ == '__main__':
+    ingest_output_text("a\na\na")

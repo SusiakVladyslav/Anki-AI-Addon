@@ -2,7 +2,7 @@ from aqt import gui_hooks
 from aqt.qt import QMenu, QAction, qconnect
 
 from ai.OpenAI_Anki import write_ai_output_to_file, generate_audios
-from utils.utils import write_notes_to_file, write_file_to_notes, change_the_notes
+from utils.func_utils import write_notes_to_file, write_file_to_notes, change_the_notes
 from gui.gui import on_browser_context_menu, on_browser_context_menu_card_menu
 
 
