@@ -1,32 +1,19 @@
 import os
 import json
 from typing import Final
+from pathlib import Path
 
-AI_DIR: Final = os.path.dirname(os.path.abspath(__file__))
-ADDON_PATH: Final = os.path.abspath(os.path.join(AI_DIR, ".."))
-META_PATH: Final = ADDON_PATH + "/meta.json"
+ADDON_PATH: Final = Path(__file__).resolve().parent.parent
+META_PATH: Final = ADDON_PATH / "meta.json"
 
 if os.path.exists(META_PATH):
     with open(META_PATH, "r") as f:
         CONFIG = json.load(f)["config"]
 
-NOTES_INFO_FILE_NAME: Final = CONFIG.get("Notes_info")
-NOTES_INFO_PATH: Final = os.path.join(ADDON_PATH, NOTES_INFO_FILE_NAME)
-AI_RESPONSE: Final = CONFIG.get("AI_response")
-AI_RESPONSE_PATH: Final = os.path.join(ADDON_PATH, AI_RESPONSE)
-SAVE_FILE_PATH = os.path.join(ADDON_PATH, "../Save file.txt")
-
-if not os.path.exists("../Audios"):
-    os.mkdir("../Audios")
-
-AUDIO_PATH: Final = os.path.join(ADDON_PATH, "../Audios")
-
-TAG = CONFIG.get("TAG")
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY")
-AI_URL: Final = "https://api.openai.com/v1/responses"
-TTS_URL: Final = "https://api.openai.com/v1/audio/speech"
-
 MODEL: Final = CONFIG.get("Model")
+
+AI_URL: Final = "https://api.openai.com/v1/responses"
 EMPTY_LINE: Final = "<br><br>"
 
 MODELS_INPUT_PRICES = {

@@ -31,4 +31,4 @@ def fetch_response(list_of_words: str, prompt: str) -> dict:
 
 
 if __name__ == '__main__':
-    print(request_something())
+    pass
