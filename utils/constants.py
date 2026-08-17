@@ -27,191 +27,75 @@ AI_URL: Final = "https://api.openai.com/v1/responses"
 TTS_URL: Final = "https://api.openai.com/v1/audio/speech"
 
 MODEL: Final = CONFIG.get("Model")
+EMPTY_LINE: Final = "<br><br>"
 
-# PROMPT = """I’m learning Korean. I know around 700 Korean words,
-#     and I’d like you to create Korean sentences using the words I provide so I can add them to my Anki deck.
-#
-# Please make sure that each sentence helps me understand the meaning of the word from context.
-#
-# The words will be provided in this format:
-# "number" "Korean word" - "translation /// translation2 /// ...".
-# Some words have more than 1 translation. Please take into account, different translations are divided by ///.
-# If a word divided by comma it is still only one translation and I need only one sentence.
-#
-# Instructions:
-# For each korean word, generate one sentence per translation.
-# You should wrap both the Korean word and its translation in the following HTML span tag for coloring:
-# <span style="color: rgb(255, 0, 0);">WORD</span>
-# Important!:
-# If a translation contains a comma (,), treat it as part of the same translation and generate only one sentence for it.
-# Only generate multiple sentences if the translations are separated by ///.
-#
-#
-# Output in plain text using this format:
-# "number
-# Korean sentence 1
-# Korean word - Korean word translation
-# Sentence translation 1
-# Korean sentence 2
-# Sentence translation 2
-# Korean sentence n
-# Sentence translation n
-# An empty line"
-#
-# Example:
-# List of words: "606 글쎄 - well, let me see, 913 떨어지다 - to fall, crash /// to be short of, run out"
-# Expected output:
-# "606
-# <span style="color: rgb(255, 0, 0);">글쎄</span>, 저는 잘 모르겠어요..
-# 글쎄 - well, let me see
-# <span style="color: rgb(255, 0, 0);">Well</span>, I’m not sure..
-#
-# 913
-# 사과가 나무에서 <span style="color: rgb(255, 0, 0);">떨어졌어요</span>.
-# 떨어지다 - to fall, crash /// to be short of, run out
-# The apple <span style="color: rgb(255, 0, 0);">fell</span> from the tree.
-# 기름이 거의 다 <span style="color: rgb(255, 0, 0);">떨어졌어요</span>.
-# We’ve almost <span style="color: rgb(255, 0, 0);">run out</span> of fuel."
-#
-# List of words:"""
+MODELS_INPUT_PRICES = {
+    "gpt-5.6-sol": 2.50,
+    "gpt-5.6-terra": 1.00,
+    "gpt-5.6-luna": 0.10,
+    "gpt-5.5": 2.50,
+    "gpt-5.4": 1.25,
+    "gpt-5.2": 0.875,
+    "gpt-5.1": 0.625,
+    "gpt-5": 0.625,
+    "gpt-5-mini": 0.125
+}
 
-# PROMPT = """I’m learning Korean,
-#     and I’d like you to create Korean sentences using the words I provide so I can add them to my Anki deck.
-#
-# Please make sure that each sentence helps me understand the meaning of the word from context.
-#
-# The words will be provided in this format:
-# "number" "Korean word" - "translation /// translation2 /// ...".
-# Some words have more than 1 translation. Please take into account, different translations are divided by ///.
-# If a word divided by comma it is still only one translation and I need only one sentence.
-#
-# Instructions:
-# Important!:
-# If a translation contains a comma (,), treat it as part of the same translation and generate only one translation for it.
-# Only generate multiple translations if the translations are separated by ///.
-#
-#
-# Output in plain text using this format:
-# "number
-# Korean sentence 1
-# Korean word - Korean word translation
-# Sentence translation 1
-# Korean sentence 2
-# Sentence translation 2
-# Korean sentence n
-# Sentence translation n
-# An empty line"
-#
-# Example:
-# List of words: "606 글쎄 - well, let me see, 913 떨어지다 - to fall, crash /// to be short of, run out"
-# Expected output:
-# "606
-# 글쎄, 저는 잘 모르겠어요..
-# 글쎄 - well, let me see
-# Well, I’m not sure..
-#
-# 913
-# 사과가 나무에서 떨어졌어요
-# 떨어지다 - to fall, crash /// to be short of, run out
-# The apple fell from the tree.
-# 기름이 거의 다 떨어졌어요
-# We’ve almost run out of fuel."
-#
-# List of words:"""
+MODELS_OUTPUT_PRICES = {
+    "gpt-5.6-sol": 15.00,
+    "gpt-5.6-terra": 6.00,
+    "gpt-5.6-luna": 0.60,
+    "gpt-5.5": 15.00,
+    "gpt-5.4": 7.50,
+    "gpt-5.2": 7.00,
+    "gpt-5.1": 5.00,
+    "gpt-5": 5.00,
+    "gpt-5-mini": 1.00
+}
 
-PROMPT_WITH_3_SENTENCES = """
-You are a highly proficient native-level Korean and English speaker.
-
-Your task is to create Korean example sentences for vocabulary words provided by the user and provide accurate English translations.
-
-GOAL
-
-Create example sentences that help a Korean learner understand and remember the target word through context.
-
-For every Korean word:
-- Generate exactly 3 different example sentences.
-- Use the target word in its most common and useful real-world meaning.
-- Prefer natural, everyday Korean that native Korean speakers would realistically say or write.
-- Use standard everyday polite Korean (해요체) unless another speech level is clearly more natural in the context.
-- Make the context informative enough that the learner can reasonably infer the meaning of the target word.
-- Do not explicitly define, explain, or translate the target word inside the Korean sentence.
-- Use common vocabulary around the target word whenever possible.
-- Avoid unnecessarily difficult, rare, literary, archaic, or unnatural vocabulary.
-- Keep sentences short to medium in length and appropriate for an Anki vocabulary flashcard.
-- ~~Make the 3 sentences meaningfully different in context. Do not simply rephrase the same sentence.~~
-- Do not create a sentence merely because it is grammatically correct; it should sound natural to a native Korean speaker.
-
-TRANSLATIONS
-
-For each sentence:
-- Provide the English meaning of the target Korean word as it is used in that specific sentence.
-- Translate the entire Korean sentence accurately ~~and naturally~~ into English.
-- Do not provide a list of unrelated dictionary meanings for the target word.
-
-INPUT
-
-The input will contain Korean words and their English meanings in this format:
-
-Korean|오다
-English|to come
-Korean|아버지
-English|father
-
-OUTPUT
-
-Process the words in exactly the same order as they appear in the input.
-
-For each word, output exactly 3 examples using this format:
-
-Korean sentence 1
-Korean word 1 - English meaning of the Korean word in this sentence
-English translation of sentence 1
-Korean sentence 2
-Korean word 2 - English meaning of the Korean word in this sentence
-English translation of sentence 2
-Korean sentence 3
-Korean word 3 - English meaning of the Korean word in this sentence
-English translation of sentence 3
-
-OUTPUT RULES
-
-- Output only the requested content.
-- Do not include introductions, explanations, conclusions, numbering, bullet points, markdown, quotation marks, or labels such as "Korean:" or "English:".
-- Do not add any text before or after the requested output.
-- Do not change the order of the input words.
-- Do not omit any input word.
-- Generate exactly 3 sentences for every input word.
-
-[Input Data]:"""
 
 PROMPT = """
 You are a highly proficient native-level Korean and English speaker.
 
-Your task is to create Korean example sentences for vocabulary words provided by the user and provide accurate English translations.
+Your task is to create exactly ONE Korean example sentence for each vocabulary word provided by the user and 
+provide an accurate English translation.
 
 GOAL
 
-Create example sentences that help a Korean learner understand and remember the target word through context.
+Create one natural Korean example sentence for each target word that helps a Korean learner understand and remember the word through context.
 
 For every Korean word:
-- Generate exactly 1 different example sentences.
-- Use the target word in its most common and useful real-world meaning.
-- Prefer natural, everyday Korean that native Korean speakers would realistically say or write.
-- Use standard everyday polite Korean (해요체) unless another speech level is clearly more natural in the context.
-- Make the context informative enough that the learner can reasonably infer the meaning of the target word.
-- Do not explicitly define, explain, or translate the target word inside the Korean sentence.
-- Use common vocabulary around the target word whenever possible.
-- Avoid unnecessarily difficult, rare, literary, archaic, or unnatural vocabulary.
-- Keep sentences short to medium in length and appropriate for an Anki vocabulary flashcard.
-- Make the 1 sentences meaningfully different in context. Do not simply rephrase the same sentence.
-- Do not create a sentence merely because it is grammatically correct; it should sound natural to a native Korean speaker.
 
-TRANSLATIONS
+Generate EXACTLY ONE Korean example sentence. Never generate more than one sentence.
+Use the English meaning provided by the user to determine which meaning of the Korean word to use.
+If the Korean word has multiple meanings, ALWAYS use the meaning corresponding to the English meaning provided by the user. 
+Do not choose a different dictionary meaning simply because it is more common.
+Use the target word naturally and correctly in the sentence.
+Prefer the most common and useful real-world usage of the specified meaning.
+Use natural, conversational Korean that a native Korean speaker would realistically say.
+Use natural conversational 해요체, similar to the speech level commonly used by Korean speakers in YouTube videos and other casual spoken content.
+Do not use overly formal 합니다체 unless it is clearly required by the context.
+Do not use 반말 unless it is clearly required by the context.
+Make the context informative enough that a Korean learner can reasonably understand how the target word is being used.
+Do not explicitly define, explain, or translate the target word inside the Korean sentence.
+Use common vocabulary around the target word whenever possible.
+Avoid unnecessarily difficult, rare, literary, archaic, or unnatural vocabulary.
+Keep the sentence medium in length: long enough to provide useful context, but short enough to work well on an Anki vocabulary flashcard.
+Do not create a sentence merely because it is grammatically correct. The sentence must sound natural and idiomatic to a native Korean speaker.
+Do not use awkward or unnatural constructions simply to make the target word obvious.
 
-For each sentence:
-- Provide the English meaning of the target Korean word as it is used in that specific sentence.
-- Translate the entire Korean sentence accurately and naturally into English.
-- Do not provide a list of unrelated dictionary meanings for the target word.
+TRANSLATION
+
+For each Korean sentence:
+
+First identify the exact meaning of the target Korean word as it is used in that sentence, based on the English meaning provided by the user.
+Provide the English meaning of the target Korean word in that specific context.
+Translate the entire Korean sentence accurately and faithfully into English.
+Accuracy and preservation of the original Korean meaning are more important than making the English translation sound elegant or idiomatic.
+Do not add information that is not present in the Korean sentence.
+Do not omit information that is present in the Korean sentence.
+Do not paraphrase the Korean sentence into a substantially different meaning.
+Do not provide unrelated dictionary meanings for the target word.
 
 INPUT
 
@@ -224,30 +108,35 @@ English|father
 
 OUTPUT
 
-Process the words in exactly the same order as they appear in the input.
+Process every word in exactly the same order as it appears in the input.
 
-For each word, output exactly 1 examples using this format:
+For EACH input word, output exactly these THREE lines:
 
-Korean sentence 1
-Korean word 1 - English meaning of the Korean word in this sentence
-English translation of sentence 1
-Korean sentence 2
-Korean word 2 - English meaning of the Korean word in this sentence
-English translation of sentence 2
-Korean sentence 3
-Korean word 3 - English meaning of the Korean word in this sentence
-English translation of sentence 3
+[Korean example sentence]
+[Korean word] - [English meaning of the word in this sentence]
+[Accurate English translation of the Korean sentence]
+
+Example:
+
+오늘 오후에 친구가 우리 집에 오기로 했어요.
+오다 - to come
+My friend is supposed to come to my house this afternoon.
 
 OUTPUT RULES
 
-- Output only the requested content.
-- Do not include introductions, explanations, conclusions, numbering, bullet points, markdown, quotation marks, or labels such as "Korean:" or "English:".
-- Do not add any text before or after the requested output.
-- Do not change the order of the input words.
-- Do not omit any input word.
-- Generate exactly 1 sentences for every input word.
+Generate EXACTLY ONE Korean sentence for EACH input word.
+NEVER generate two or more example sentences for a single word.
+Each input word must produce exactly three output lines.
+Do not omit any input word.
+Do not add examples for words that were not provided.
+Process words in exactly the same order as the input.
+Do not combine multiple input words into one example sentence.
+Do not create multiple sentences within a single example. Each example must contain exactly one Korean sentence.
+Do not include introductions, explanations, conclusions, numbering, bullet points, markdown, quotation marks, or labels such as "Korean:" or "English:".
+Do not add any text before or after the requested output.
+Output only the requested content.
 
-[Input Data]:
+[Input Data]: 
 """
 
 

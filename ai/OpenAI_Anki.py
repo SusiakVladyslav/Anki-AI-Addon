@@ -10,8 +10,8 @@ from aqt.qt import QMessageBox
 
 from anki.notes import Note
 
-from utils.constants import NOTES_INFO_PATH, OPENAI_API_KEY, AI_RESPONSE_PATH, MODEL, PROMPT, AI_URL, AUDIO_PATH, TTS_URL
-from utils.func_utils import strip_html
+from ..utils.constants import NOTES_INFO_PATH, OPENAI_API_KEY, AI_RESPONSE_PATH, MODEL, AUDIO_PATH, TTS_URL
+from ..utils.func_utils import strip_html
 
 from ai.openai_requests import request_something
 
@@ -179,10 +179,8 @@ def make_ai_request(selected_notes: list[Note], prompt: str):
     start_time = time.time()
     output_text, input_tokens, output_tokens, cache_input_tokens = request_something(all_notes_fields_str, prompt=prompt)
     time_spent = time.time() - start_time
-    showInfo(all_notes_fields_str)
-    showInfo(f"{output_text}\n/// {input_tokens} /// {output_tokens} /// {time_spent} /// {MODEL} /// {cache_input_tokens}")
 
-    return output_text, input_tokens, output_tokens
+    return output_text, input_tokens, output_tokens, time_spent
 
 
 def get_notes_fields_as_string(selected_notes: list[Note]) -> str:
