@@ -48,8 +48,4 @@ def successful_ingestion_of_generated_korean_sentences_info(
 
 
 def unknown_generation_error_critical(browser: Browser, e: Exception) -> None:
-    show_exception(
-        parent=browser,
-        exception=e,
-        custom_message="An unknown generation error occurred."
-    )
+    showWarning(f"An unknown generation error occurred. Error message: {e}", parent=browser)
