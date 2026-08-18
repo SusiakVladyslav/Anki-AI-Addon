@@ -1,5 +1,5 @@
 from aqt.browser import Browser
-from aqt.utils import showInfo, showWarning, showCritical
+from aqt.utils import showInfo, showWarning, showCritical, show_exception
 
 
 def more_than_one_note_type_selected_warning() -> None:
@@ -10,16 +10,16 @@ def no_cards_were_selected_warning() -> None:
     showWarning("No cards were selected")
 
 
-def nothing_was_generated_critical() -> None:
-    showCritical("AI didn't generate anything.")
+def nothing_was_generated_critical(browser: Browser) -> None:
+    showCritical("AI didn't generate anything.", parent=browser)
 
 
-def less_than_3_lines_generated_critical() -> None:
-    showCritical("Unexpected amount of lines. The amount of generated lines is less than 3")
+def less_than_3_lines_generated_critical(browser: Browser) -> None:
+    showCritical("Unexpected amount of lines. The amount of generated lines is less than 3", parent=browser)
 
 
-def number_of_lines_is_not_divisible_by_3_critical() -> None:
-    showCritical("Unexpected amount of lines. The amount of generated lines is not divisible by 3")
+def number_of_lines_is_not_divisible_by_3_critical(browser: Browser) -> None:
+    showCritical("Unexpected amount of lines. The amount of generated lines is not divisible by 3", parent=browser)
 
 
 def successful_ingestion_of_generated_korean_sentences_info(
@@ -44,4 +44,12 @@ def successful_ingestion_of_generated_korean_sentences_info(
         f"\n"
         f"Model: {model}",
         parent=browser
+    )
+
+
+def unknown_generation_error_critical(browser: Browser, e: Exception) -> None:
+    show_exception(
+        parent=browser,
+        exception=e,
+        custom_message="An unknown generation error occurred."
     )
