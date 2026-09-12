@@ -1,4 +1,5 @@
 import aqt.qt
+from PyQt6.QtGui import QTextLine
 from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout
 from aqt.browser import Browser
 
@@ -37,17 +38,35 @@ class second_half_of_the_window(aqt.qt.QGridLayout):
         button4 = QPushButton("Click me")
         button4.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
 
-        combo_box = aqt.qt.QComboBox()
-        combo_box.addItem("Korean")
-        combo_box.addItem("English")
-        combo_box.addItem("Mathematical Equations")
-        combo_box.addItem("LOOOOOOOOOOOOOOOONG TEEEEEEEEEXT")
-        combo_box.addItem("VEEEEEEEEEEEEEEERY LOOOOOOOOOOOOOOOONG TEEEEEEEEEXT")
-        combo_box.addItem("VEEEEEEEEEEEEEEERYYYYYYYYYYYYYYYYYYYYYYYYY LOOOOOOOOOOOOOOOONG TEEEEEEEEEXT")
+        menus_layout = QGridLayout()
 
-        combo_box.setFixedWidth(400)
 
-        self.addWidget(combo_box, 0, 0)
+        card_types_combo_box = aqt.qt.QComboBox()
+        card_types_combo_box.addItem("Korean")
+        card_types_combo_box.addItem("English")
+        card_types_combo_box.addItem("Mathematical Equations")
+
+        card_types_combo_box.setFixedWidth(200)
+
+        ai_model_version = aqt.qt.QComboBox()
+        ai_model_version.addItems(["Astra", "Luna", "Sol"])
+
+        ai_model_version.setFixedWidth(200)
+
+        input_price_line = aqt.qt.QLineEdit()
+        input_price_line.setText("Input Price")
+        input_price_line.setReadOnly(True)
+
+        output_price_line = aqt.qt.QLineEdit()
+        output_price_line.setText("Output Price")
+        output_price_line.setReadOnly(False)
+
+        menus_layout.addWidget(card_types_combo_box, 0, 0, 1, 2)
+        menus_layout.addWidget(ai_model_version, 1, 0, 1, 2)
+        menus_layout.addWidget(input_price_line, 2, 0)
+        menus_layout.addWidget(output_price_line, 2, 1)
+
+        self.addLayout(menus_layout, 0, 0)
         self.addWidget(button2, 1, 0)
         self.addWidget(button3, 1, 1)
 
