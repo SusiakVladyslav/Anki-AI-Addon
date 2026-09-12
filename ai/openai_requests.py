@@ -1,7 +1,7 @@
 import requests
 import time
 
-from utils.constants import OPENAI_API_KEY, MODEL, AI_URL
+from ..utils.constants import OPENAI_API_KEY, MODEL, AI_URL
 
 
 def send_open_ai_request(input_data: str, prompt: str) -> tuple[str, int, int, int, float]:

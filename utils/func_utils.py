@@ -7,8 +7,8 @@ from aqt.browser import Browser
 
 from anki.notes import Note
 
-from utils.constants import PROMPT, EMPTY_LINE, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
-import gui.dialogs as dialogs
+from .constants import PROMPT, EMPTY_LINE, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
+from ..gui import dialogs
 from ..ai import openai_requests as openai
 
 

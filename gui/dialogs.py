@@ -1,5 +1,5 @@
 from aqt.browser import Browser
-from aqt.utils import showInfo, showWarning, showCritical, show_exception
+from aqt.utils import showInfo, showWarning, showCritical
 
 
 def more_than_one_note_type_selected_warning() -> None:

@@ -5,7 +5,7 @@ from aqt.browser import Browser
 
 from ..utils.constants import MODEL
 from ..utils.func_utils import generate_sentences_and_update_notes, calculate_spent_money, get_selected_notes
-import gui.dialogs as dialogs
+from . import dialogs
 from ..utils.exceptions import NothingWasGenerated, LessThan3LinesGenerated, NumberOfLinesNotDivisibleBy3
 
 
