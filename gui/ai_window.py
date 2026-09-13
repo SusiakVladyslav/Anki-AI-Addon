@@ -1,79 +1,113 @@
 import aqt.qt
 from PyQt6.QtGui import QTextLine
-from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout, QWidget
 from aqt.browser import Browser
 
-class ConfigurationDialog(aqt.qt.QDialog):
+class ProfileConfigurationDialog(aqt.qt.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle("Configuration")
+        self.setWindowTitle("Profile Configuration")
         self.resize(800, 600)
         self.setModal(False)
         self.setSizeGripEnabled(True)
 
-        plain_text_edit = aqt.qt.QPlainTextEdit()
-        plain_text_edit.setPlaceholderText("Placeholder text")
+        prompt_text_edit = aqt.qt.QPlainTextEdit()
+        prompt_text_edit.setPlaceholderText("Enter your prompt here")
+        prompt_text_edit.setToolTip("")  # TODO: Write a proper tool tip for prompt text edit
 
         grid = aqt.qt.QGridLayout(self)
-        grid.addWidget(plain_text_edit, 0, 0)
-        grid.addLayout(second_half_of_the_window(),0 ,1)
+        grid.addWidget(prompt_text_edit, 0, 0)
+        grid.addLayout(ProfileCreationSettings(),0 ,1)
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
 
-class second_half_of_the_window(aqt.qt.QGridLayout):
+class ProfileCreationSettings(aqt.qt.QGridLayout):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.addLayout(NoteFieldsCheckBoxes(fields_list=["Korean", "English", "Hanja", "Number", "Front", "Back", "Audio"]), 0, 1)
+        self.addLayout(NoteFieldsCheckBoxes(fields_tuple=("Korean", "English", "Hanja", "Number", "Front", "Back", "Audio")), 0, 1)
 
-        button1 = QPushButton("Click me")
-        button1.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
-        button2 = QPushButton("Click me")
-        button2.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
-        button3 = QPushButton("Click me")
-        button3.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
-        button4 = QPushButton("Click me")
-        button4.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
+        tabs = aqt.qt.QTabWidget()
 
-        menus_layout = QGridLayout()
+        field_widget = aqt.qt.QWidget()
+        field_layout = aqt.qt.QVBoxLayout(field_widget)
 
+        fields_output_text_edit = aqt.qt.QPlainTextEdit()
+        fields_output_text_edit.setPlaceholderText("Field Output is:")
 
-        card_types_combo_box = aqt.qt.QComboBox()
-        card_types_combo_box.addItem("Korean")
-        card_types_combo_box.addItem("English")
-        card_types_combo_box.addItem("Mathematical Equations")
+        field_layout.addWidget(fields_output_text_edit)
 
-        card_types_combo_box.setFixedWidth(200)
+        setting_widget = aqt.qt.QWidget()
+        setting_layout = aqt.qt.QVBoxLayout(setting_widget)
 
-        ai_model_version = aqt.qt.QComboBox()
-        ai_model_version.addItems(["Astra", "Luna", "Sol"])
+        setting_button = aqt.qt.QPushButton("Settings button")
+        setting_layout.addWidget(setting_button)
 
-        ai_model_version.setFixedWidth(200)
+        tabs.addTab(field_widget, "Field Output")  # TODO add expected output from AI text field
+        tabs.addTab(setting_widget, "Settings")
+
+        self.addLayout(GenerationConfigLayout(), 0, 0)
+        self.addWidget(tabs, 1, 0, 1, 2)
+        # self.addWidget(button3, 1, 1)
+
+class GenerationConfigLayout(aqt.qt.QGridLayout):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # self.addLayout(NoteFieldsCheckBoxes(fields_list=["Korean", "English", "Hanja", "Number", "Front", "Back", "Audio"]), 0, 1)
+
+        card_types_combo_box = CardTypesComboBox()
+        ai_model_version = AiModelsComboBox()
+
+        input_price_label = aqt.qt.QLabel("Input price:")
+        output_price_label = aqt.qt.QLabel("Output price:")
+
+        input_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+        output_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
         input_price_line = aqt.qt.QLineEdit()
-        input_price_line.setText("Input Price")
+        input_price_line.setText("5.00$")
         input_price_line.setReadOnly(True)
+        input_price_line.setToolTip("Input Price for 1M tokens for model")
 
         output_price_line = aqt.qt.QLineEdit()
         output_price_line.setText("Output Price")
-        output_price_line.setReadOnly(False)
+        output_price_line.setReadOnly(True)
 
-        menus_layout.addWidget(card_types_combo_box, 0, 0, 1, 2)
-        menus_layout.addWidget(ai_model_version, 1, 0, 1, 2)
-        menus_layout.addWidget(input_price_line, 2, 0)
-        menus_layout.addWidget(output_price_line, 2, 1)
+        self.addWidget(card_types_combo_box, 0, 0, 1, 2)
+        self.addWidget(ai_model_version, 1, 0, 1, 2)
+        self.addWidget(input_price_label, 2, 0)
+        self.addWidget(output_price_label, 2, 1)
+        self.addWidget(input_price_line, 3, 0)
+        self.addWidget(output_price_line, 3, 1)
 
-        self.addLayout(menus_layout, 0, 0)
-        self.addWidget(button2, 1, 0)
-        self.addWidget(button3, 1, 1)
 
+class CardTypesComboBox(aqt.qt.QComboBox):
+    def __init__(self, parent: QWidget | None=None, available_card_types: tuple[str] = tuple()):
+        super().__init__(parent)
+
+        self.addItems(available_card_types)
+        self.setFixedWidth(200)
+
+
+class AiModelsComboBox(aqt.qt.QComboBox):
+    def __init__(self, parent: QWidget | None=None, models: tuple[str] = tuple()):
+        super().__init__(parent)
+
+        self.addItems(models)
+        self.setFixedWidth(200)
+
+
+class AiModelPrices(aqt.qt.QGridLayout):
+    def __init__(self, parent: QWidget | None=None, input_price=0, output_price=0):
+        super().__init__(parent)
 
 
 class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
-    def __init__(self, fields_list: list[str]=[]):
+    def __init__(self, fields_tuple: tuple[str]=tuple()):
         super().__init__()
 
         fields_check_boxes_container = aqt.qt.QWidget()
@@ -81,7 +115,7 @@ class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
         fields_check_boxes_vertical_layout = aqt.qt.QVBoxLayout(fields_check_boxes_container)
 
 
-        for field in fields_list:
+        for field in fields_tuple:
             check_box = aqt.qt.QCheckBox(str(field))
             check_box.setChecked(True)
 
@@ -99,5 +133,5 @@ class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
 
 
 def open_configuration_dialog(browser):
-    configuration_dialog = ConfigurationDialog(browser)
+    configuration_dialog = ProfileConfigurationDialog(browser)
     configuration_dialog.exec()
