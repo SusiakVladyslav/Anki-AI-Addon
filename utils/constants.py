@@ -16,6 +16,18 @@ MODEL: Final = CONFIG.get("Model")
 AI_URL: Final = "https://api.openai.com/v1/responses"
 EMPTY_LINE: Final = "<br><br>"
 
+AVAILABLE_MODELS = (
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.3",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-5-mini"
+)
+
 MODELS_INPUT_PRICES = {
     "gpt-5.6-sol": 2.50,
     "gpt-5.6-terra": 1.00,
