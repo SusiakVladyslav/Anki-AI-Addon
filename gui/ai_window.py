@@ -1,4 +1,5 @@
 import aqt.qt
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QTextLine
 from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout, QWidget
 from aqt.browser import Browser
@@ -13,7 +14,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Profile Configuration")
-        self.resize(800, 600)
+        self.resize(1200, 800)
         self.setModal(False)
         self.setSizeGripEnabled(True)
 
@@ -44,11 +45,29 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # fields_tuple = ("Korean", "English", "Hanja", "Number", "Front", "Back", "Audio")
+        self.generation_config = GenerationConfigLayout()
+        self.settings_tabs = SettingTabs()
 
-        self.addWidget(GenerationConfigLayout(), 0, 0)
-        # self.addLayout(NoteFieldsCheckBoxes(fields_tuple=("Calculus Mathematical Equations", "Answer")), 0, 1)
-        self.addWidget(SettingTabs(), 1, 0)
+        self._update_expected_io_text_edits_on_fields_check_box_toggle()
+        self._update_fields_setting_combo_box_on_fields_check_box_toggle()
+
+        self._send_signal_of_initial_checkboxes_creation()
+
+        self.addWidget(self.generation_config, 0, 0)
+        self.addWidget(self.settings_tabs, 1, 0)
+
+    def _send_signal_of_initial_checkboxes_creation(self):
+        self.generation_config.note_fields_check_boxes.on_check_box_toggled()
+
+    def _update_expected_io_text_edits_on_fields_check_box_toggle(self):
+        self.generation_config.note_fields_check_boxes.fields_changed.connect(
+            self.settings_tabs.expected_input_and_output.update_text_edits
+        )
+
+    def _update_fields_setting_combo_box_on_fields_check_box_toggle(self):
+        self.generation_config.note_fields_check_boxes.fields_changed.connect(
+            self.settings_tabs.profile_creation_tab.update_fields_setting_combo_box
+        )
 
 
 class GenerationConfigLayout(aqt.qt.QWidget):
@@ -59,6 +78,7 @@ class GenerationConfigLayout(aqt.qt.QWidget):
 
         self.card_types_combo_box = CardTypesComboBox()
         self.note_fields_check_boxes = NoteFieldsCheckBoxes()
+
         self.on_card_type_selection()
         self.card_types_combo_box.currentIndexChanged.connect(self.on_card_type_selection)
 
@@ -69,7 +89,7 @@ class GenerationConfigLayout(aqt.qt.QWidget):
 
         grid.addWidget(self.card_types_combo_box, 0, 0)
         grid.addLayout(self.note_fields_check_boxes, 0, 1, 3, 1)
-        grid.addWidget(self.ai_models_combo_box , 1, 0)
+        grid.addWidget(self.ai_models_combo_box, 1, 0)
         grid.addLayout(self.ai_model_prices, 2, 0)
 
     def on_card_type_selection(self):
@@ -92,15 +112,18 @@ class CardTypesComboBox(aqt.qt.QComboBox):
         super().__init__(parent)
 
         self.addItems(mw.col.models.all_names())
-        self.setFixedWidth(200)
 
 
 class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
+    fields_changed = aqt.qt.pyqtSignal(dict)
+
     def __init__(self):
         super().__init__()
 
         self.fields_check_boxes_widget = aqt.qt.QWidget()
         self.fields_check_boxes_vertical_layout = aqt.qt.QVBoxLayout(self.fields_check_boxes_widget)
+        self.check_boxes_list = []
+        self.fields_status = {}
 
         self.scroll_area = aqt.qt.QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -117,8 +140,12 @@ class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
         for field in fields_list:
             check_box = aqt.qt.QCheckBox(str(field))
             check_box.setChecked(True)
+            check_box.toggled.connect(self.on_check_box_toggled)
 
             self.fields_check_boxes_vertical_layout.addWidget(check_box)
+            self.check_boxes_list.append(check_box)
+
+        self.on_check_box_toggled()
 
     def clear_field_check_boxes(self):
         while self.fields_check_boxes_vertical_layout.count():
@@ -127,6 +154,12 @@ class NoteFieldsCheckBoxes(aqt.qt.QVBoxLayout):
 
             if widget:
                 widget.deleteLater()
+        self.check_boxes_list.clear()
+
+    def on_check_box_toggled(self):
+        self.fields_status = {cb.text(): cb.isChecked() for cb in self.check_boxes_list}
+        self.fields_changed.emit(self.fields_status)
+
 
 
 class AiModelsComboBox(aqt.qt.QComboBox):
@@ -134,7 +167,6 @@ class AiModelsComboBox(aqt.qt.QComboBox):
         super().__init__(parent)
 
         self.addItems(AVAILABLE_MODELS)
-        self.setFixedWidth(200)
 
 
 class AiModelPricesLayout(aqt.qt.QGridLayout):
@@ -161,24 +193,28 @@ class AiModelPricesLayout(aqt.qt.QGridLayout):
         self.addWidget(self.output_price_line, 1, 1)
 
     def set_input_price(self, input_price: float):
-        self.input_price_line.setText(f"{input_price:.2f}$")
+        self.input_price_line.setText(decide_price_format(input_price) + "$")
 
     def set_output_price(self, output_price: float):
-        self.output_price_line.setText(f"{output_price:.2f}$")
+        self.output_price_line.setText(decide_price_format(output_price) + "$")
 
 
 class SettingTabs(aqt.qt.QTabWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        setting_widget = aqt.qt.QWidget()
-        setting_layout = aqt.qt.QVBoxLayout(setting_widget)
+        self.setting_widget = aqt.qt.QWidget()
+        self.setting_layout = aqt.qt.QVBoxLayout(self.setting_widget)
 
-        setting_button = aqt.qt.QPushButton("Settings button")
-        setting_layout.addWidget(setting_button)
+        self.setting_button = aqt.qt.QPushButton("Settings button")
+        self.setting_layout.addWidget(self.setting_button)
 
-        self.addTab(ExpectedInputAndOutput(), "Expected Input and Output")  # TODO add expected output from AI text field
-        self.addTab(setting_widget, "Settings")
+        self.expected_input_and_output = ExpectedInputAndOutput()
+        self.profile_creation_tab = ProfileCreationTab()
+
+        self.addTab(self.profile_creation_tab, "Profile creation")
+        self.addTab(self.expected_input_and_output, "Expected Input and Output")
+        self.addTab(self.setting_widget, "Settings")
 
 
 class ExpectedInputAndOutput(aqt.qt.QWidget):
@@ -193,23 +229,231 @@ class ExpectedInputAndOutput(aqt.qt.QWidget):
         expected_output_label = aqt.qt.QLabel("Expected output from AI is:")
         expected_output_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
-        expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
-        expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")  # TODO Is tooltip good enough?
-        expected_fields_input_to_ai_text_edit.setReadOnly(True)
+        self.font = aqt.qt.QFont()
+        self.font.setPointSize(12)
 
-        expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
-        expected_output_from_ai_text_edit.setToolTip("This is how the output from AI should look like")
-        expected_output_from_ai_text_edit.setReadOnly(True)
+        self.expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
+        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")  # TODO Is tooltip good enough?
+        self.expected_fields_input_to_ai_text_edit.setReadOnly(True)
+
+        self.expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
+        self.expected_output_from_ai_text_edit.setToolTip("This is how the output from AI should look like")
+        self.expected_output_from_ai_text_edit.setReadOnly(True)
+
+        self.expected_fields_input_to_ai_text_edit.setFont(self.font)
+        self.expected_output_from_ai_text_edit.setFont(self.font)
+
+        self.expected_fields_input_to_ai_text_edit.setLineWrapMode(
+            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
+        )
+        self.expected_fields_input_to_ai_text_edit.setHorizontalScrollBarPolicy(
+            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        self.expected_output_from_ai_text_edit.setLineWrapMode(
+            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
+        )
+        self.expected_output_from_ai_text_edit.setHorizontalScrollBarPolicy(
+            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
 
         field_layout.addWidget(expected_input_label, 0, 0)
         field_layout.addWidget(expected_output_label, 0, 1)
-        field_layout.addWidget(expected_fields_input_to_ai_text_edit, 1, 0)
-        field_layout.addWidget(expected_output_from_ai_text_edit, 1, 1)
+        field_layout.addWidget(self.expected_fields_input_to_ai_text_edit, 1, 0)
+        field_layout.addWidget(self.expected_output_from_ai_text_edit, 1, 1)
+
+    def update_text_edits(self, fields_status: dict[str, bool]):
+        selected_fields = [field for field, value in fields_status.items() if value]
+        input_text = "".join(f"{field}|{{Field Data}}\n" for field in selected_fields)
+        output_text = "".join(f"{field}|{{Generated Data}}\n" for field in selected_fields)
+
+        self.expected_fields_input_to_ai_text_edit.setPlainText(input_text)
+        self.expected_output_from_ai_text_edit.setPlainText(output_text)
 
 
-def open_configuration_dialog(browser: Browser):
+class ProfileCreationTab(aqt.qt.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        grid = aqt.qt.QGridLayout(self)
+
+        self.create_profile_button = aqt.qt.QPushButton("Create Profile")
+        self.enter_profile_name_label = aqt.qt.QLabel("Enter profile name:")
+        self.profile_name_line_edit = aqt.qt.QLineEdit()
+        self.setting_for_individual_field_checkbox = aqt.qt.QCheckBox("Apply setting to individual fields")
+        self.fields_setting_combo_box = FieldsSettingsComboBox()
+        self.fields_settings = FieldsSettings()
+
+        self.field_setting_combo_box_opacity_effect = aqt.qt.QGraphicsOpacityEffect(self.fields_setting_combo_box)
+        self.fields_setting_combo_box.setGraphicsEffect(self.field_setting_combo_box_opacity_effect)
+        self.profile_name_line_edit.setToolTip("Enter Profile Name")
+        self._add_function_for_individual_field_application_check_box_toggle()
+        self._update_label_text_on_field_setting_text_change()
+
+        grid.addWidget(self.setting_for_individual_field_checkbox, 0, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignBottom | aqt.qt.Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.fields_setting_combo_box, 1, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.enter_profile_name_label, 2, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignBottom | aqt.qt.Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.profile_name_line_edit, 3, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.fields_settings, 0, 1, 4, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignRight)
+        grid.addWidget(self.create_profile_button, 5, 0, 1, 2)
+
+        self._on_individual_field_application_check_box_toggle(False)
+
+        self.fields_setting_combo_box.setFixedWidth(200)
+        self.profile_name_line_edit.setFixedWidth(200)
+
+        grid.setRowStretch(4,4)
+
+        ITEM_HEIGHT = 20
+
+        # Left side
+        self.setting_for_individual_field_checkbox.setFixedHeight(ITEM_HEIGHT)
+        self.fields_setting_combo_box.setFixedHeight(ITEM_HEIGHT)
+        self.enter_profile_name_label.setFixedHeight(ITEM_HEIGHT)
+        self.profile_name_line_edit.setFixedHeight(ITEM_HEIGHT)
+
+        # Right side
+        self.fields_settings.fields_setting_label.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_html_check_box.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_brackets_check_box.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_non_ascii_check_box.setFixedHeight(ITEM_HEIGHT)
+
+    def _on_individual_field_application_check_box_toggle(self, checked:bool):
+        self.fields_setting_combo_box.setEnabled(checked)
+
+        if checked:
+            self.field_setting_combo_box_opacity_effect.setOpacity(1.0)
+            current_field = self.fields_setting_combo_box.currentText()
+            if current_field:
+                self.fields_settings.clean_field_data()
+                self.fields_settings.load_settings(current_field)
+        else:
+            self.field_setting_combo_box_opacity_effect.setOpacity(0.8)
+            self.fields_settings.update_field_setting_labes_as_all_fields()
+            self.fields_settings.clean_field_data()
+
+    def _update_label_text_on_field_setting_text_change(self):
+        self.fields_setting_combo_box.currentTextChanged.connect(
+            self._on_field_setting_combo_box_changed
+        )
+
+    def _on_field_setting_combo_box_changed(self, new_field: str):
+        if self.setting_for_individual_field_checkbox.isChecked() and new_field:
+            self.fields_settings.load_settings(new_field)
+
+    def _add_function_for_individual_field_application_check_box_toggle(self):
+        self.setting_for_individual_field_checkbox.toggled.connect(
+            self._on_individual_field_application_check_box_toggle
+        )
+
+    def update_fields_setting_combo_box(self, fields_status: dict[str, bool]):
+        self.fields_setting_combo_box.set_fields_to_combo_box(fields_status)
+        self.fields_settings.clean_field_data()
+
+
+
+class FieldsSettingsComboBox(aqt.qt.QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def set_fields_to_combo_box(self, fields_status: dict[str, bool]) -> None:
+        self.clear()
+
+        selected_fields = [field for field, value in fields_status.items() if value]
+        self.addItems(selected_fields)
+
+
+class FieldsSettings(aqt.qt.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        v_layout = aqt.qt.QVBoxLayout(self)
+
+        self._field_data: dict[str, dict[str, bool]] = {}
+        self._current_field: str | None = None
+
+        self.fields_setting_label = aqt.qt.QLabel("All Fields Settings:")
+        self.strip_html_check_box = aqt.qt.QCheckBox("Strip HTML in fields")
+        self.strip_brackets_check_box = aqt.qt.QCheckBox("Strip brackets in fields")
+        self.strip_non_ascii_check_box = aqt.qt.QCheckBox("Strip non-ascii characters in fields")
+
+        self.strip_html_check_box.toggled.connect(self._on_setting_change)
+        self.strip_brackets_check_box.toggled.connect(self._on_setting_change)
+        self.strip_non_ascii_check_box.toggled.connect(self._on_setting_change)
+
+        v_layout.addWidget(self.fields_setting_label)
+        v_layout.addWidget(self.strip_html_check_box)
+        v_layout.addWidget(self.strip_brackets_check_box)
+        v_layout.addWidget(self.strip_non_ascii_check_box)
+
+        v_layout.setSpacing(12)
+
+    def _on_setting_change(self):
+        if not self._current_field:
+            return
+
+        self._field_data[self._current_field] = {
+            "strip_html" : self.strip_html_check_box.isChecked(),
+            "strip_brackets" : self.strip_brackets_check_box.isChecked(),
+            "strip_non_ascii" : self.strip_non_ascii_check_box.isChecked()
+        }
+
+    def load_settings(self, field_name: str):
+
+        self._current_field = field_name
+        self._update_field_setting_label_as_individual_field(field_name)
+
+        default_settings = {
+            "strip_html": False,
+            "strip_brackets": False,
+            "strip_non_ascii": False
+        }
+
+        settings = self._field_data.setdefault(field_name, default_settings)
+
+        self._block_signals_to_check_boxes(True)
+
+        self.strip_html_check_box.setChecked(settings["strip_html"])
+        self.strip_brackets_check_box.setChecked(settings["strip_brackets"])
+        self.strip_non_ascii_check_box.setChecked(settings["strip_non_ascii"])
+
+        self._block_signals_to_check_boxes(False)
+
+    def _update_field_setting_label_as_individual_field(self, selected_field):
+        self.fields_setting_label.setText(f"{selected_field} Field Settings:")
+
+    def _block_signals_to_check_boxes(self, state: bool):
+        self.strip_html_check_box.blockSignals(state)
+        self.strip_brackets_check_box.blockSignals(state)
+        self.strip_non_ascii_check_box.blockSignals(state)
+
+    def update_field_setting_labes_as_all_fields(self):  # TODO See where I can remove this function
+        self.fields_setting_label.setText("All Fields Settings:")
+
+    def clean_field_data(self):
+        self._field_data.clear()
+
+        self._block_signals_to_check_boxes(True)
+
+        self.strip_html_check_box.setChecked(False)
+        self.strip_brackets_check_box.setChecked(False)
+        self.strip_non_ascii_check_box.setChecked(False)
+
+        self._block_signals_to_check_boxes(False)
+
+
+
+def open_configuration_dialog(browser: Browser) -> None:
     configuration_dialog = ProfileConfigurationDialog(browser)
     configuration_dialog.exec()
+
+
+def decide_price_format(price: float) -> str:
+    three_digits_after_decimal_point_price = f"{price:.3f}"
+    if three_digits_after_decimal_point_price.endswith("0"):
+        return f"{price:.2f}"
+
+    return three_digits_after_decimal_point_price
 
 def test_function():
     aqt.utils.showInfo(str(mw.col.models.all_names()))

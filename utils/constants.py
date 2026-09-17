@@ -22,7 +22,6 @@ AVAILABLE_MODELS = (
     "gpt-5.6-luna",
     "gpt-5.5",
     "gpt-5.4",
-    "gpt-5.3",
     "gpt-5.2",
     "gpt-5.1",
     "gpt-5-mini"
@@ -56,8 +55,7 @@ MODELS_OUTPUT_PRICES = {
 PROMPT = """
 You are a highly proficient native-level Korean and English speaker.
 
-Your task is to create exactly ONE Korean example sentence for each vocabulary word provided by the user and 
-provide an accurate English translation.
+Your task is to create exactly ONE Korean example sentence for each vocabulary word provided by the user and provide an accurate English translation.
 
 GOAL
 
