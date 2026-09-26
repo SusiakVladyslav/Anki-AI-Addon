@@ -1,7 +1,7 @@
 import aqt.qt
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QTextLine
-from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QGridLayout, QPushButton, QLabel, QVBoxLayout, QWidget, QTableWidgetItem
 from aqt.browser import Browser
 from aqt import mw
 import anki
@@ -50,6 +50,7 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
 
         self._update_expected_io_text_edits_on_fields_check_box_toggle()
         self._update_fields_setting_combo_box_on_fields_check_box_toggle()
+        self._update_table_rows_on_fields_check_box_toggle()
 
         self._send_signal_of_initial_checkboxes_creation()
 
@@ -68,6 +69,18 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
         self.generation_config.note_fields_check_boxes.fields_changed.connect(
             self.settings_tabs.profile_creation_tab.update_fields_setting_combo_box
         )
+
+    def _update_table_rows_on_fields_check_box_toggle(self):
+        self.generation_config.note_fields_check_boxes.fields_changed.connect(
+            self.settings_tabs.profile_creation_tab.fields_settings_table.fill_field_name_columns
+        )
+
+        self.generation_config.note_fields_check_boxes.fields_changed.connect(
+            self.settings_tabs.profile_creation_tab.fields_settings_table.fill_strip_columns_with_default_values
+        )
+
+    def _update_table_rows_on_fields_check_box_toggled(self):
+        pass
 
 
 class GenerationConfigLayout(aqt.qt.QWidget):
@@ -277,15 +290,20 @@ class ProfileCreationTab(aqt.qt.QWidget):
 
         grid = aqt.qt.QGridLayout(self)
 
+        self.fields_settings_table = FieldsSettingsTable()
         self.create_profile_button = aqt.qt.QPushButton("Create Profile")
         self.enter_profile_name_label = aqt.qt.QLabel("Enter profile name:")
         self.profile_name_line_edit = aqt.qt.QLineEdit()
         self.setting_for_individual_field_checkbox = aqt.qt.QCheckBox("Apply setting to individual fields")
         self.fields_setting_combo_box = FieldsSettingsComboBox()
         self.fields_settings = FieldsSettings()
+        self.create_new_cards_checkbox = aqt.qt.QCheckBox("Create new cards from generated data")
 
         self.field_setting_combo_box_opacity_effect = aqt.qt.QGraphicsOpacityEffect(self.fields_setting_combo_box)
         self.fields_setting_combo_box.setGraphicsEffect(self.field_setting_combo_box_opacity_effect)
+        self.fields_settings_table_opacity_effect = aqt.qt.QGraphicsOpacityEffect(self.fields_settings_table)
+        self.fields_settings_table.setGraphicsEffect(self.fields_settings_table_opacity_effect)  # TODO can I create in a different method
+
         self.profile_name_line_edit.setToolTip("Enter Profile Name")
         self._add_function_for_individual_field_application_check_box_toggle()
         self._update_label_text_on_field_setting_text_change()
@@ -295,6 +313,7 @@ class ProfileCreationTab(aqt.qt.QWidget):
         grid.addWidget(self.enter_profile_name_label, 2, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignBottom | aqt.qt.Qt.AlignmentFlag.AlignLeft)
         grid.addWidget(self.profile_name_line_edit, 3, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignLeft)
         grid.addWidget(self.fields_settings, 0, 1, 4, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignRight)
+        grid.addWidget(self.fields_settings_table, 4, 0, 1, 2)
         grid.addWidget(self.create_profile_button, 5, 0, 1, 2)
 
         self._on_individual_field_application_check_box_toggle(False)
@@ -302,33 +321,31 @@ class ProfileCreationTab(aqt.qt.QWidget):
         self.fields_setting_combo_box.setFixedWidth(200)
         self.profile_name_line_edit.setFixedWidth(200)
 
-        grid.setRowStretch(4,4)
+        # grid.setRowStretch(4,4)
 
-        ITEM_HEIGHT = 20
+        self._set_widgets_height()
 
-        # Left side
-        self.setting_for_individual_field_checkbox.setFixedHeight(ITEM_HEIGHT)
-        self.fields_setting_combo_box.setFixedHeight(ITEM_HEIGHT)
-        self.enter_profile_name_label.setFixedHeight(ITEM_HEIGHT)
-        self.profile_name_line_edit.setFixedHeight(ITEM_HEIGHT)
-
-        # Right side
-        self.fields_settings.fields_setting_label.setFixedHeight(ITEM_HEIGHT)
-        self.fields_settings.strip_html_check_box.setFixedHeight(ITEM_HEIGHT)
-        self.fields_settings.strip_brackets_check_box.setFixedHeight(ITEM_HEIGHT)
-        self.fields_settings.strip_non_ascii_check_box.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.fields_changed.connect(
+            self.fields_settings_table.fill_strip_columns
+        )
 
     def _on_individual_field_application_check_box_toggle(self, checked:bool):
         self.fields_setting_combo_box.setEnabled(checked)
+        self.fields_settings_table.setEnabled(checked)
 
         if checked:
             self.field_setting_combo_box_opacity_effect.setOpacity(1.0)
+            self.fields_settings_table_opacity_effect.setOpacity(1.0)
             current_field = self.fields_setting_combo_box.currentText()
             if current_field:
                 self.fields_settings.clean_field_data()
                 self.fields_settings.load_settings(current_field)
         else:
             self.field_setting_combo_box_opacity_effect.setOpacity(0.8)
+            self.fields_settings_table_opacity_effect.setOpacity(0.8)
+            self.fields_settings_table.clearSelection()
+            self.fields_settings_table.fill_strip_columns_with_default_values()
+
             self.fields_settings.update_field_setting_labes_as_all_fields()
             self.fields_settings.clean_field_data()
 
@@ -346,9 +363,28 @@ class ProfileCreationTab(aqt.qt.QWidget):
             self._on_individual_field_application_check_box_toggle
         )
 
+    def _set_widgets_height(self):
+        ITEM_HEIGHT = 20
+
+        # Left side
+        self.setting_for_individual_field_checkbox.setFixedHeight(ITEM_HEIGHT)
+        self.fields_setting_combo_box.setFixedHeight(ITEM_HEIGHT)
+        self.enter_profile_name_label.setFixedHeight(ITEM_HEIGHT)
+        self.profile_name_line_edit.setFixedHeight(ITEM_HEIGHT)
+
+        # Right side
+        self.fields_settings.fields_setting_label.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_html_check_box.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_brackets_check_box.setFixedHeight(ITEM_HEIGHT)
+        self.fields_settings.strip_non_ascii_check_box.setFixedHeight(ITEM_HEIGHT)
+
+
     def update_fields_setting_combo_box(self, fields_status: dict[str, bool]):
         self.fields_setting_combo_box.set_fields_to_combo_box(fields_status)
         self.fields_settings.clean_field_data()
+
+    # def update_table_row_names_for_new_card_type(self, list_of_labels_names: list[str]):
+    #     self.fields_settings_table.fill_field_name_column(list_of_labels_names)
 
 
 
@@ -364,6 +400,8 @@ class FieldsSettingsComboBox(aqt.qt.QComboBox):
 
 
 class FieldsSettings(aqt.qt.QWidget):
+    fields_changed = aqt.qt.pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -397,6 +435,8 @@ class FieldsSettings(aqt.qt.QWidget):
             "strip_brackets" : self.strip_brackets_check_box.isChecked(),
             "strip_non_ascii" : self.strip_non_ascii_check_box.isChecked()
         }
+
+        self.fields_changed.emit(self._field_data)
 
     def load_settings(self, field_name: str):
 
@@ -442,6 +482,57 @@ class FieldsSettings(aqt.qt.QWidget):
         self._block_signals_to_check_boxes(False)
 
 
+class FieldsSettingsTable(aqt.qt.QTableWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
+
+        self.setColumnCount(4)
+        self.setHorizontalHeaderLabels(['Field Name', 'Strip HTML', 'Strip brackets', 'Strip non-ascii'])
+
+        self.horizontalHeader().setSectionResizeMode(
+            aqt.qt.QHeaderView.ResizeMode.Stretch
+        )
+
+        self.verticalHeader().hide()
+
+    def fill_field_name_columns(self, fields_status: dict[str, bool]):
+        selected_fields = [field for field, value in fields_status.items() if value]
+        selected_fields_length = len(selected_fields)
+        self.setRowCount(selected_fields_length)
+
+        for row_index in range(selected_fields_length):
+            self.setItem(row_index, 0, QTableWidgetItem(selected_fields[row_index]))
+
+    def fill_strip_columns(self, field_data: dict[str, dict[str, bool]]):
+        for row_index in range(self.rowCount()):
+            field_name_cell = self.item(row_index, 0)
+            field_name = field_name_cell.text() if field_name_cell else ""
+
+            if field_name in field_data:
+                field_settings = field_data[field_name]
+
+                for col_index, strip_setting in enumerate(("strip_html", "strip_brackets", "strip_non_ascii"), start=1):
+                    self.setItem(
+                        row_index,
+                        col_index,
+                        create_table_check_item(checked=field_settings[strip_setting])
+                    )
+
+
+    def fill_strip_columns_with_default_values(self):
+        for row_index in range(self.rowCount()):
+            for col in (1, 2, 3):
+                self.setItem(row_index, col, create_table_check_item(checked=False))
+
+
+    def clean_strip_columns_values(self):
+        for row_index in range(self.rowCount()):
+            self.setItem(row_index, 1, QTableWidgetItem(""))
+            self.setItem(row_index, 2, QTableWidgetItem(""))
+            self.setItem(row_index, 3, QTableWidgetItem(""))
+
 
 def open_configuration_dialog(browser: Browser) -> None:
     configuration_dialog = ProfileConfigurationDialog(browser)
@@ -454,6 +545,18 @@ def decide_price_format(price: float) -> str:
         return f"{price:.2f}"
 
     return three_digits_after_decimal_point_price
+
+def create_table_check_item(checked: bool) -> QTableWidgetItem:
+    green = "#4CAF50"
+    red = "#F44336"
+
+    symbol = "✔" if checked else "✖"
+    color = green if checked else red
+
+    item = QTableWidgetItem(symbol)
+    item.setForeground(aqt.qt.QColor(color))
+    item.setTextAlignment(aqt.Qt.AlignmentFlag.AlignCenter)
+    return item
 
 def test_function():
     aqt.utils.showInfo(str(mw.col.models.all_names()))
