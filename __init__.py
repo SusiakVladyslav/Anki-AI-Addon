@@ -17,10 +17,6 @@ def setup_browser_menu(browser) -> None:
     qconnect(window_action.triggered, lambda _=False: open_configuration_dialog(browser))
     my_menu.addAction(window_action)
 
-    test_action = QAction("Test action", browser)
-    qconnect(test_action.triggered, lambda _=False: test_function())
-    my_menu.addAction(test_action)
-
 
 gui_hooks.browser_menus_did_init.append(setup_browser_menu)
 
