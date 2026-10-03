@@ -2,7 +2,7 @@ from aqt import gui_hooks
 from aqt.qt import QMenu, QAction, qconnect
 
 from .gui.browser_gui import generate_sentences_for_selected_notes_action
-from .gui.ai_window import *
+from .gui.create_profile_configuration import *
 
 
 def setup_browser_menu(browser) -> None:

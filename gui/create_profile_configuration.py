@@ -24,6 +24,64 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
+        self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
+
+    def get_profile_creation_settings(self):
+        setting_for_created_profile_dict = dict()
+        setting_for_created_profile_dict["prompt_text"] = self.prompt_text_edit.prompt_text_edit.toPlainText()
+        prompt_text = self.prompt_text_edit.prompt_text_edit.toPlainText()
+
+        selected_card_type = self.profile_creation_settings.card_types_combo_box.currentText()
+        selected_model = self.profile_creation_settings.ai_models_combo_box.currentText()
+        selected_fields_dict:dict[str, bool] = self.profile_creation_settings.fields_selection_check_boxes.fields_status
+
+        selected_fields = [field for field, checked in selected_fields_dict.items() if checked]
+
+        fields_setting_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
+        fields_setting_data: dict[str, dict[str, bool]] = fields_setting_tab.fields_settings._field_data
+
+        general_setting_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        generate_data_as_new_cards = general_setting_tab.generate_as_new_cards_checkbox.isChecked()
+
+        selected_deck_for_new_generated_cards = (
+            general_setting_tab.choose_deck_combo_box.currentText()
+            if generate_data_as_new_cards else None
+        )
+
+        tag_for_new_generated_cards = (
+            general_setting_tab.add_tag_to_generated_cards_checkbox.isChecked()
+            if generate_data_as_new_cards else None
+        )
+
+        tag_name_for_new_generated_cards = (
+            general_setting_tab.tag_name_line_edit.text()
+            if tag_for_new_generated_cards else None
+        )
+
+        profile_name = general_setting_tab.enter_profile_name_line_edit.text()
+
+        aqt.utils.showInfo(f"{prompt_text}"
+                           f"\n"
+                           f"{selected_card_type}"
+                           f"\n"
+                           f"{selected_fields}"
+                           f"\n"
+                           f"{selected_model}"
+                           f"\n"
+                           f"{fields_setting_data}"
+                           f"\n"
+                           f"Generate data as new cards: {generate_data_as_new_cards}"
+                           f"\n"
+                           f"{selected_deck_for_new_generated_cards}"
+                           f"\n"
+                           f"Generate data with the tag: {tag_for_new_generated_cards}"
+                           f"\n"
+                           f"{tag_name_for_new_generated_cards}"
+                           f"\n"
+                           f"{profile_name}"
+                           f"\n"
+                           )
+
 
 class PromptTextEditLayout(aqt.qt.QWidget):
     def __init__(self, parent=None):
@@ -35,11 +93,14 @@ class PromptTextEditLayout(aqt.qt.QWidget):
         self.prompt_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
         self.prompt_text_edit = aqt.qt.QPlainTextEdit()
+        self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
         self.prompt_text_edit.setPlaceholderText("Enter your prompt here")
         self.prompt_text_edit.setToolTip("")  # TODO: Write a proper tool tip for prompt text edit
 
         grid.addWidget(self.prompt_label, 0, 0)
         grid.addWidget(self.prompt_text_edit, 1, 0)
+
+        grid.setRowStretch(1, 1)
 
 
 class ProfileCreationSettings(aqt.qt.QGridLayout):
@@ -52,6 +113,8 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
         self.ai_model_prices = AiModelPricesLayout()
 
         self.settings_tabs = SettingTabs()
+        self.create_profile_button = aqt.qt.QPushButton("Create Profile")
+        self.create_profile_button.setStyleSheet("margin-bottom: 9px") # ALign the create_profile_button with prompt text edit
 
         self._reset_fields_settings_on_card_type_switch() # Reset needs to be before card type fields selection update, so the data is being cleared and then we receive the seleceted fields data
         self._update_fields_selection_check_boxes_on_card_type_switch()
@@ -68,6 +131,7 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
         self.addWidget(self.ai_models_combo_box, 1, 0)
         self.addLayout(self.ai_model_prices, 2, 0)
         self.addWidget(self.settings_tabs, 3, 0, 1, 2)
+        self.addWidget(self.create_profile_button, 4, 0, 1, 2)
 
     def _send_initial_signals(self):
         self.card_types_combo_box.on_card_type_switch()
@@ -232,9 +296,11 @@ class SettingTabs(aqt.qt.QTabWidget):
 
         self.expected_input_and_output = ExpectedInputAndOutput()
         self.fields_setting_tab = FieldsSettingsTab()
+        self.general_settings_tab = GeneralSettingsTab()
 
         self.addTab(self.fields_setting_tab, "Fields settings")
         self.addTab(self.expected_input_and_output, "Expected Input and Output")
+        self.addTab(self.general_settings_tab, "General settings")
 
 
 class ExpectedInputAndOutput(aqt.qt.QWidget):
@@ -461,6 +527,112 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
                     col_index,
                     create_table_check_item(checked=field_settings[strip_setting])
                 )
+
+
+class GeneralSettingsTab(aqt.qt.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        main_layout = aqt.qt.QHBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(50)
+
+        left_layout = aqt.qt.QVBoxLayout()
+        left_layout.setSpacing(0)
+
+        self.generate_as_new_cards_checkbox = aqt.qt.QCheckBox("Generate data as a new cards")
+
+        self.choose_deck_label = aqt.qt.QLabel("Choose deck to save generated cards in:")
+        self.choose_deck_combo_box = aqt.qt.QComboBox()
+        self.choose_deck_combo_box.setFixedWidth(220)
+
+        self.add_tag_to_generated_cards_checkbox = aqt.qt.QCheckBox("Add tag to generated cards")
+        self.enter_tag_name_label = aqt.qt.QLabel("Enter tag name:")
+        self.tag_name_line_edit = aqt.qt.QLineEdit()
+        self.tag_name_line_edit.setFixedWidth(220)
+
+        left_layout.addWidget(self.generate_as_new_cards_checkbox)
+        left_layout.addSpacing(15)
+        left_layout.addWidget(self.choose_deck_label)
+        left_layout.addSpacing(6)
+        left_layout.addWidget(self.choose_deck_combo_box)
+        left_layout.addSpacing(18)
+        left_layout.addWidget(self.add_tag_to_generated_cards_checkbox)
+        left_layout.addSpacing(15)
+        left_layout.addWidget(self.enter_tag_name_label)
+        left_layout.addSpacing(6)
+        left_layout.addWidget(self.tag_name_line_edit)
+        left_layout.addStretch(1)
+
+        # --- Right Column (Profile Settings) ---
+        right_layout = aqt.qt.QVBoxLayout()
+        right_layout.setSpacing(8)
+
+        self.enter_profile_name_label = aqt.qt.QLabel("Enter profile name:")
+        self.enter_profile_name_line_edit = aqt.qt.QLineEdit()
+        self.enter_profile_name_line_edit.setFixedWidth(220)
+
+        right_layout.addWidget(self.enter_profile_name_label)
+        right_layout.addWidget(self.enter_profile_name_line_edit)
+        right_layout.addStretch(1)
+
+        main_layout.addLayout(left_layout)
+        main_layout.addLayout(right_layout)
+        main_layout.addStretch(1)
+
+        self._add_deck_names_to_the_combo_box()
+        self._create_opacity_effects()
+
+        self.generate_as_new_cards_checkbox.toggled.connect(self._switch_other_widgets_opacity)
+        self.add_tag_to_generated_cards_checkbox.toggled.connect(self._switch_add_tag_widget_opacity)
+
+        self._switch_other_widgets_opacity(self.generate_as_new_cards_checkbox.isChecked())
+        self._switch_add_tag_widget_opacity(self.add_tag_to_generated_cards_checkbox.isChecked())
+
+    def _create_opacity_effects(self):
+        self.widgets_with_opacity_effect = [
+            self.choose_deck_label,
+            self.choose_deck_combo_box,
+            self.add_tag_to_generated_cards_checkbox,
+            self.enter_tag_name_label,
+            self.tag_name_line_edit,
+        ]
+
+        self.opacity_effects_list = []
+        for index, widget in enumerate(self.widgets_with_opacity_effect):
+            effect = aqt.qt.QGraphicsOpacityEffect(widget)
+            self.opacity_effects_list.append(effect)
+            widget.setGraphicsEffect(effect)
+
+    def _switch_other_widgets_opacity(self, checked: bool):
+        widget_and_opacity_effect_tuple = zip(
+            self.widgets_with_opacity_effect[0:3], self.opacity_effects_list[0:3]
+        )
+        opacity = 1.0 if checked else 0.5
+
+        for widget, opacity_effect in widget_and_opacity_effect_tuple:
+            widget.setEnabled(checked)
+            opacity_effect.setOpacity(opacity)
+
+            if not checked and isinstance(widget, aqt.qt.QCheckBox):
+                widget.setChecked(False)
+
+    def _switch_add_tag_widget_opacity(self, checked: bool):
+        widget_and_opacity_effect_tuple = zip(
+            self.widgets_with_opacity_effect[3:], self.opacity_effects_list[3:]
+        )
+        opacity = 1.0 if checked else 0.5
+
+        for widget, opacity_effect in widget_and_opacity_effect_tuple:
+            widget.setEnabled(checked)
+            opacity_effect.setOpacity(opacity)
+
+            if not checked and isinstance(widget, aqt.qt.QLineEdit):
+                widget.clear()
+
+    def _add_deck_names_to_the_combo_box(self):
+        deck_names: list[str] = mw.col.decks.all_names()
+        self.choose_deck_combo_box.addItems(deck_names)
 
 
 def decide_price_format(price: float) -> str:
