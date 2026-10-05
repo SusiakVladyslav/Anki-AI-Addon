@@ -2,12 +2,14 @@ import aqt.qt
 from aqt.browser import Browser
 from aqt import mw
 
+from . import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
 
 
 class ProfileConfigurationDialog(aqt.qt.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.parent = parent
 
         self.setWindowTitle("Profile Configuration")
         self.resize(1200, 800)
@@ -27,60 +29,36 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
 
     def get_profile_creation_settings(self):
-        setting_for_created_profile_dict = dict()
-        setting_for_created_profile_dict["prompt_text"] = self.prompt_text_edit.prompt_text_edit.toPlainText()
-        prompt_text = self.prompt_text_edit.prompt_text_edit.toPlainText()
+        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
 
-        selected_card_type = self.profile_creation_settings.card_types_combo_box.currentText()
-        selected_model = self.profile_creation_settings.ai_models_combo_box.currentText()
-        selected_fields_dict:dict[str, bool] = self.profile_creation_settings.fields_selection_check_boxes.fields_status
+        selected_fields = [
+            field for field, checked in self.profile_creation_settings.fields_selection_check_boxes.fields_status.items()
+            if checked
+        ]
 
-        selected_fields = [field for field, checked in selected_fields_dict.items() if checked]
+        generate_as_new_cards = general_tab.generate_as_new_cards_checkbox.isChecked()
+        add_tag = generate_as_new_cards and general_tab.add_tag_to_generated_cards_checkbox.isChecked()
+        profile_name = general_tab.enter_profile_name_line_edit.text().strip()
 
-        fields_setting_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
-        fields_setting_data: dict[str, dict[str, bool]] = fields_setting_tab.fields_settings._field_data
+        profile_settings_dict = {profile_name:
+            {
+                "selected_card_type": self.profile_creation_settings.card_types_combo_box.currentText(),
+                "selected_fields": selected_fields,
+                "selected_fields_settings": fields_tab.fields_settings._field_data,
+                "generate_as_new_cards": generate_as_new_cards,
+                "deck_for_generated_cards": general_tab.choose_deck_combo_box.currentText() if generate_as_new_cards else None,
+                "add_tag_to_generated_cards": add_tag,
+                "tag_name_for_generated_cards": general_tab.tag_name_line_edit.text().strip() if add_tag else None,
+                "prompt_text": self.prompt_text_edit.prompt_text_edit.toPlainText().strip()
+            }
+        }
 
-        general_setting_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
-        generate_data_as_new_cards = general_setting_tab.generate_as_new_cards_checkbox.isChecked()
+        if gui_utils.insert_profile_settings_in_config(profile_settings_dict):
+            self.accept()
+            aqt.utils.showInfo(f"Profile {profile_name} created", parent=self.parent)
 
-        selected_deck_for_new_generated_cards = (
-            general_setting_tab.choose_deck_combo_box.currentText()
-            if generate_data_as_new_cards else None
-        )
 
-        tag_for_new_generated_cards = (
-            general_setting_tab.add_tag_to_generated_cards_checkbox.isChecked()
-            if generate_data_as_new_cards else None
-        )
-
-        tag_name_for_new_generated_cards = (
-            general_setting_tab.tag_name_line_edit.text()
-            if tag_for_new_generated_cards else None
-        )
-
-        profile_name = general_setting_tab.enter_profile_name_line_edit.text()
-
-        aqt.utils.showInfo(f"{prompt_text}"
-                           f"\n"
-                           f"{selected_card_type}"
-                           f"\n"
-                           f"{selected_fields}"
-                           f"\n"
-                           f"{selected_model}"
-                           f"\n"
-                           f"{fields_setting_data}"
-                           f"\n"
-                           f"Generate data as new cards: {generate_data_as_new_cards}"
-                           f"\n"
-                           f"{selected_deck_for_new_generated_cards}"
-                           f"\n"
-                           f"Generate data with the tag: {tag_for_new_generated_cards}"
-                           f"\n"
-                           f"{tag_name_for_new_generated_cards}"
-                           f"\n"
-                           f"{profile_name}"
-                           f"\n"
-                           )
 
 
 class PromptTextEditLayout(aqt.qt.QWidget):
@@ -116,7 +94,7 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
         self.create_profile_button = aqt.qt.QPushButton("Create Profile")
         self.create_profile_button.setStyleSheet("margin-bottom: 9px") # ALign the create_profile_button with prompt text edit
 
-        self._reset_fields_settings_on_card_type_switch() # Reset needs to be before card type fields selection update, so the data is being cleared and then we receive the seleceted fields data
+        self._reset_fields_settings_on_card_type_switch() # Reset needs to be before card type fields selection update, so the data is being cleared, and then we receive the seleceted fields data
         self._update_fields_selection_check_boxes_on_card_type_switch()
         self._update_ai_model_prices_on_ai_model_switch()
 
@@ -280,11 +258,11 @@ class AiModelPricesLayout(aqt.qt.QGridLayout):
 
     def set_input_price(self, model_name: str):
         input_price = MODELS_INPUT_PRICES[model_name]
-        self.input_price_line.setText(decide_price_format(input_price) + "$")
+        self.input_price_line.setText(gui_utils.decide_price_format(input_price) + "$")
 
     def set_output_price(self, model_name: str):
         output_price = MODELS_OUTPUT_PRICES[model_name]
-        self.output_price_line.setText(decide_price_format(output_price) + "$")
+        self.output_price_line.setText(gui_utils.decide_price_format(output_price) + "$")
 
 
 class SettingTabs(aqt.qt.QTabWidget):
@@ -525,7 +503,7 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
                 self.setItem(
                     row_index,
                     col_index,
-                    create_table_check_item(checked=field_settings[strip_setting])
+                    gui_utils.create_table_check_item(checked=field_settings[strip_setting])
                 )
 
 
@@ -634,26 +612,10 @@ class GeneralSettingsTab(aqt.qt.QWidget):
         deck_names: list[str] = mw.col.decks.all_names()
         self.choose_deck_combo_box.addItems(deck_names)
 
+# def open_configuration_dialog(browser: Browser) -> None:
+#     configuration_dialog = ProfileConfigurationDialog(browser)
+#     configuration_dialog.accepted.connect(lambda: aqt.utils.showInfo("Text"))
+#     configuration_dialog.open()
 
-def decide_price_format(price: float) -> str:
-    three_digits_after_decimal_point_price = f"{price:.3f}"
-    if three_digits_after_decimal_point_price.endswith("0"):
-        return f"{price:.2f}"
-
-    return three_digits_after_decimal_point_price
-
-def create_table_check_item(checked: bool) -> aqt.qt.QTableWidgetItem:
-    green = "#4CAF50"
-    red = "#F44336"
-
-    symbol = "✔" if checked else "✖"
-    color = green if checked else red
-
-    item = aqt.qt.QTableWidgetItem(symbol)
-    item.setForeground(aqt.qt.QColor(color))
-    item.setTextAlignment(aqt.Qt.AlignmentFlag.AlignCenter)
-    return item
-
-def open_configuration_dialog(browser: Browser) -> None:
-    configuration_dialog = ProfileConfigurationDialog(browser)
-    configuration_dialog.exec()
+def func(number):
+    aqt.utils.showInfo(f"Upddate {number}")

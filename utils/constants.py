@@ -1,14 +1,11 @@
-import os
-import json
+import aqt.utils
+from aqt import mw
 from typing import Final
-from pathlib import Path
 
-ADDON_PATH: Final = Path(__file__).resolve().parent.parent
-META_PATH: Final = ADDON_PATH / "meta.json"
+ADDON_PACKAGE = mw.addonManager.addon_from_module(__name__)
+CONFIG = mw.addonManager.getConfig(ADDON_PACKAGE)
 
-if os.path.exists(META_PATH):
-    with open(META_PATH, "r") as f:
-        CONFIG = json.load(f)["config"]
+# mw.addonManager.writeConfig(__name__, config)
 
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY")
 MODEL: Final = CONFIG.get("Model")
