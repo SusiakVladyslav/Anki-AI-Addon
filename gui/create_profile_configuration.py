@@ -542,7 +542,6 @@ class GeneralSettingsTab(aqt.qt.QWidget):
         left_layout.addWidget(self.tag_name_line_edit)
         left_layout.addStretch(1)
 
-        # --- Right Column (Profile Settings) ---
         right_layout = aqt.qt.QVBoxLayout()
         right_layout.setSpacing(8)
 
@@ -611,11 +610,3 @@ class GeneralSettingsTab(aqt.qt.QWidget):
     def _add_deck_names_to_the_combo_box(self):
         deck_names: list[str] = mw.col.decks.all_names()
         self.choose_deck_combo_box.addItems(deck_names)
-
-# def open_configuration_dialog(browser: Browser) -> None:
-#     configuration_dialog = ProfileConfigurationDialog(browser)
-#     configuration_dialog.accepted.connect(lambda: aqt.utils.showInfo("Text"))
-#     configuration_dialog.open()
-
-def func(number):
-    aqt.utils.showInfo(f"Upddate {number}")

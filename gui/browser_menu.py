@@ -4,6 +4,7 @@ import aqt
 
 from .browser_gui import generate_sentences_for_selected_notes_action
 from .create_profile_configuration import ProfileConfigurationDialog
+from .apply_profile_window import ApplyProfileDialog
 from .. utils.constants import CONFIG
 
 def setup_browser_menus(browser: Browser) -> None:
@@ -23,7 +24,7 @@ def populate_ai_generation_profiles_menu(browser: Browser, generation_profiles_m
     generation_profiles_menu.addSeparator()
 
     create_profile_action = QAction("Create Profile", browser)
-    qconnect(create_profile_action.triggered, lambda _=False: open_configuration_dialog(browser, generation_profiles_menu))
+    qconnect(create_profile_action.triggered, lambda: open_configuration_dialog(browser, generation_profiles_menu))
     generation_profiles_menu.addAction(create_profile_action)
 
 def open_configuration_dialog(browser: Browser, generation_profiles_menu) -> None:
@@ -36,18 +37,27 @@ def setup_profile_buttons(browser: Browser, generation_profiles_menu: QMenu) -> 
 
     for profile_name, profile_settings in profile_dicts.items():
         profile_action = QAction(f"Profile {profile_name}", browser)
+        # qconnect(
+        #     profile_action.triggered,  # .triggered returns False for buttons that were clicked(not checkboxes), so I need a var where I store the value, because otherwise name function will have value False
+        #     lambda _=False, name = profile_name, settings = profile_settings: on_profile_selected(
+        #         browser, name, settings
+        #     )
+        # )
+
         qconnect(
-            profile_action.triggered,
-            lambda checked=False, name = profile_name, settings = profile_settings: on_profile_selected(
-                browser, name, settings
-            )
+            profile_action.triggered, lambda: open_apply_profile_dialog(browser, profile_name)
         )
+
         generation_profiles_menu.addAction(profile_action)
 
 def on_profile_selected(browser:Browser, profile_name: str, profile_settings: dict) -> None:
     aqt.utils.showInfo(f"Profile {profile_name} was clicked\n Settings: {profile_settings}", parent=browser)
 
+def open_apply_profile_dialog(browser: Browser, profile_name: str) -> None:
+    apply_profile_dialog = ApplyProfileDialog(browser, profile_name)
+    apply_profile_dialog.open()
+
 def populate_my_addon_menu(browser: Browser, my_menu: QMenu) -> None:
     action = QAction("Generate sentences for selected Korean Notes", browser)
-    qconnect(action.triggered, lambda _=False: generate_sentences_for_selected_notes_action(browser))
+    qconnect(action.triggered, lambda: generate_sentences_for_selected_notes_action(browser))
     my_menu.addAction(action)
