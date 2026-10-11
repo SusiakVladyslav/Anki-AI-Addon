@@ -45,7 +45,9 @@ def setup_profile_buttons(browser: Browser, generation_profiles_menu: QMenu) -> 
         # )
 
         qconnect(
-            profile_action.triggered, lambda: open_apply_profile_dialog(browser, profile_name)
+            profile_action.triggered,
+            lambda _=False, browser=browser, profile_name=profile_name:
+                open_apply_profile_dialog(browser, profile_name)
         )
 
         generation_profiles_menu.addAction(profile_action)

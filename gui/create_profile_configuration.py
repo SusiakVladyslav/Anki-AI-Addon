@@ -3,7 +3,7 @@ from aqt.browser import Browser
 from aqt import mw
 
 from . import gui_utils
-from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
+from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES, CONFIG
 
 
 class ProfileConfigurationDialog(aqt.qt.QDialog):
@@ -18,15 +18,25 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
         self.prompt_text_edit = PromptTextEditLayout()
         self.profile_creation_settings = ProfileCreationSettings()
+        # self.prompt_text_edit.setStyleSheet("margin-bottom: 1px")
+
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Save
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
 
         grid = aqt.qt.QGridLayout(self)
         grid.addWidget(self.prompt_text_edit, 0, 0)
-        grid.addLayout(self.profile_creation_settings,0 ,1)
+        grid.addWidget(self.profile_creation_settings, 0, 1)
+        grid.addWidget(self.commit_buttons_box, 1, 1)
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
-        self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
+        # self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
+
+        self.commit_buttons_box.rejected.connect(self.reject)
+        self.commit_buttons_box.accepted.connect(self.get_profile_creation_settings)
 
     def get_profile_creation_settings(self):
         general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
@@ -46,6 +56,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
                 "selected_card_type": self.profile_creation_settings.card_types_combo_box.currentText(),
                 "selected_fields": selected_fields,
                 "selected_fields_settings": fields_tab.fields_settings._field_data,
+                "selected_model": self.profile_creation_settings.ai_models_combo_box.currentText(),
                 "generate_as_new_cards": generate_as_new_cards,
                 "deck_for_generated_cards": general_tab.choose_deck_combo_box.currentText() if generate_as_new_cards else None,
                 "add_tag_to_generated_cards": add_tag,
@@ -57,6 +68,29 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         if gui_utils.insert_profile_settings_in_config(profile_settings_dict):
             self.accept()
             aqt.utils.showInfo(f"Profile {profile_name} created", parent=self.parent)
+
+    def load_profile_settings(self, profile_name: str, profile_settings):
+        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
+
+        general_tab.enter_profile_name_line_edit.setText(profile_name)
+
+        self.profile_creation_settings.card_types_combo_box.setCurrentText(profile_settings["selected_card_type"])
+        for check_box in self.profile_creation_settings.fields_selection_check_boxes.check_boxes_list:
+            check_box.setChecked(check_box.text() in profile_settings["selected_fields"])
+
+        fields_tab.fields_settings._field_data = profile_settings["selected_fields_settings"]
+        fields_tab.fields_settings.fields_settings_changed.emit(profile_settings["selected_fields_settings"])
+        fields_tab.fields_settings.load_field_settings(fields_tab.fields_setting_combo_box.currentText())
+
+        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
+        general_tab.generate_as_new_cards_checkbox.setChecked(profile_settings["generate_as_new_cards"])
+        general_tab.choose_deck_combo_box.setCurrentText(profile_settings["deck_for_generated_cards"])
+        general_tab.add_tag_to_generated_cards_checkbox.setChecked(profile_settings["add_tag_to_generated_cards"])
+        general_tab.tag_name_line_edit.setText(profile_settings["tag_name_for_generated_cards"])
+        self.prompt_text_edit.prompt_text_edit.setPlainText(profile_settings["prompt_text"])
+
+        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
 
 
 
@@ -81,7 +115,7 @@ class PromptTextEditLayout(aqt.qt.QWidget):
         grid.setRowStretch(1, 1)
 
 
-class ProfileCreationSettings(aqt.qt.QGridLayout):
+class ProfileCreationSettings(aqt.qt.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -91,8 +125,9 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
         self.ai_model_prices = AiModelPricesLayout()
 
         self.settings_tabs = SettingTabs()
-        self.create_profile_button = aqt.qt.QPushButton("Create Profile")
-        self.create_profile_button.setStyleSheet("margin-bottom: 9px") # ALign the create_profile_button with prompt text edit
+        # self.settings_tabs.setStyleSheet("margin-bottom: 9px")
+        # self.create_profile_button = aqt.qt.QPushButton("Create Profile")
+        # self.create_profile_button.setStyleSheet("margin-bottom: 9px") # ALign the create_profile_button with prompt text edit
 
         self._reset_fields_settings_on_card_type_switch() # Reset needs to be before card type fields selection update, so the data is being cleared, and then we receive the seleceted fields data
         self._update_fields_selection_check_boxes_on_card_type_switch()
@@ -104,12 +139,14 @@ class ProfileCreationSettings(aqt.qt.QGridLayout):
 
         self._send_initial_signals()
 
-        self.addWidget(self.card_types_combo_box, 0, 0)
-        self.addWidget(self.fields_selection_check_boxes, 0, 1, 3, 1)
-        self.addWidget(self.ai_models_combo_box, 1, 0)
-        self.addLayout(self.ai_model_prices, 2, 0)
-        self.addWidget(self.settings_tabs, 3, 0, 1, 2)
-        self.addWidget(self.create_profile_button, 4, 0, 1, 2)
+        grid = aqt.qt.QGridLayout(self)
+
+        grid.addWidget(self.card_types_combo_box, 0, 0)
+        grid.addWidget(self.fields_selection_check_boxes, 0, 1, 3, 1)
+        grid.addWidget(self.ai_models_combo_box, 1, 0)
+        grid.addLayout(self.ai_model_prices, 2, 0)
+        grid.addWidget(self.settings_tabs, 3, 0, 1, 2)
+        # self.addWidget(self.create_profile_button, 4, 0, 1, 2)
 
     def _send_initial_signals(self):
         self.card_types_combo_box.on_card_type_switch()
