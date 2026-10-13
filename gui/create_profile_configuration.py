@@ -1,17 +1,30 @@
+from typing import Any
+
 import aqt.qt
 from aqt.browser import Browser
 from aqt import mw
+from enum import Enum, auto
+from typing import Any
 
 from . import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES, CONFIG
 
 
+class DialogMode(Enum):
+    CREATE = auto()
+    EDIT = auto()
+    VIEW = auto()
+
+
 class ProfileConfigurationDialog(aqt.qt.QDialog):
-    def __init__(self, parent=None):
+    profile_name_changed = aqt.qt.pyqtSignal(str)
+
+    def __init__(self, mode: DialogMode=DialogMode.CREATE, parent=None):
         super().__init__(parent)
         self.parent = parent
+        self.mode = mode
+        self.original_profile_name: str|None = None
 
-        self.setWindowTitle("Profile Configuration")
         self.resize(1200, 800)
         self.setModal(False)
         self.setSizeGripEnabled(True)
@@ -20,10 +33,8 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.profile_creation_settings = ProfileCreationSettings()
         # self.prompt_text_edit.setStyleSheet("margin-bottom: 1px")
 
-        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
-            aqt.qt.QDialogButtonBox.StandardButton.Save
-            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
-        )
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox()
+        self._setup_ui_for_mode()
 
         grid = aqt.qt.QGridLayout(self)
         grid.addWidget(self.prompt_text_edit, 0, 0)
@@ -35,15 +46,69 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
         # self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
 
-        self.commit_buttons_box.rejected.connect(self.reject)
-        self.commit_buttons_box.accepted.connect(self.get_profile_creation_settings)
+    def _setup_ui_for_mode(self):
+        if self.mode == DialogMode.CREATE:
+            self._setup_create_profile_mode()
 
-    def get_profile_creation_settings(self):
+        elif self.mode == DialogMode.EDIT:
+            self._setup_edit_mode()
+
+        elif self.mode == DialogMode.VIEW:
+            self._setup_view_mode()
+
+    def _setup_create_profile_mode(self):
+        self.setWindowTitle("Create Profile")
+
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Save
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
+
+        self.commit_buttons_box.rejected.connect(self.reject)
+        self.commit_buttons_box.accepted.connect(self._insert_profile_settings)
+
+    def _setup_edit_mode(self):
+        self.setWindowTitle("Edit Profile: {}")
+
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Save
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
+
+        self.commit_buttons_box.rejected.connect(self.reject)
+        self.commit_buttons_box.accepted.connect(self._update_profile_settings)
+
+    def _setup_view_mode(self):
+        self.setWindowTitle("View settings for Profile: {}")
+
+        self.prompt_text_edit.setEnabled(False)
+        # self.profile_creation_settings.setEnabled(False)
+
+        # self.card_types_combo_box = CardTypesComboBox()
+        # self.fields_selection_check_boxes = FieldsSelectionCheckBoxes()
+        # self.ai_models_combo_box = AiModelsComboBox()
+        # self.ai_model_prices = AiModelPricesLayout()
+
+        self.profile_creation_settings.card_types_combo_box.setEnabled(False)
+        self.profile_creation_settings.fields_selection_check_boxes.setEnabled(False)
+        self.profile_creation_settings.ai_models_combo_box.setEnabled(False)
+
+        self.profile_creation_settings.ai_model_prices.input_price_line.setEnabled(False)
+        self.profile_creation_settings.ai_model_prices.input_price_label.setEnabled(False)
+        self.profile_creation_settings.ai_model_prices.output_price_label.setEnabled(False)
+        self.profile_creation_settings.ai_model_prices.output_price_line.setEnabled(False)
+
+        self.profile_creation_settings.settings_tabs.fields_setting_tab.setEnabled(False)
+        self.profile_creation_settings.settings_tabs.general_settings_tab.setEnabled(False)
+        self.profile_creation_settings.settings_tabs.expected_input_and_output.setEnabled(False)
+
+    def _collect_profile_settings(self) -> dict[str, dict[str, Any]]:
         general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
         fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
 
         selected_fields = [
-            field for field, checked in self.profile_creation_settings.fields_selection_check_boxes.fields_status.items()
+            field for field, checked in
+            self.profile_creation_settings.fields_selection_check_boxes.fields_status.items()
             if checked
         ]
 
@@ -51,7 +116,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         add_tag = generate_as_new_cards and general_tab.add_tag_to_generated_cards_checkbox.isChecked()
         profile_name = general_tab.enter_profile_name_line_edit.text().strip()
 
-        profile_settings_dict = {profile_name:
+        return {profile_name:
             {
                 "selected_card_type": self.profile_creation_settings.card_types_combo_box.currentText(),
                 "selected_fields": selected_fields,
@@ -65,11 +130,36 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             }
         }
 
-        if gui_utils.insert_profile_settings_in_config(profile_settings_dict):
+    def _insert_profile_settings(self):
+        profile_settings = self._collect_profile_settings()
+        if gui_utils.insert_profile_settings_in_config(profile_settings):
             self.accept()
-            aqt.utils.showInfo(f"Profile {profile_name} created", parent=self.parent)
+            aqt.utils.showInfo(f"Profile {str(profile_settings.keys())} created", parent=self.parent)
+
+    def _update_profile_settings(self):
+        edited_profile_settings = self._collect_profile_settings()
+        edited_profile_name = next(iter(edited_profile_settings))
+
+        if self.original_profile_name == edited_profile_name:
+            if gui_utils.update_profile_settings_name(edited_profile_settings, profile_name_was_edited=False):
+                self.accept()  # TODO Do I need still this accept function here?
+                aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
+        else:
+            if gui_utils.update_profile_settings_name(
+                edited_profile_settings,
+                profile_name_was_edited=True,
+                original_profile_name=self.original_profile_name
+            ):
+                self.profile_name_changed.emit(edited_profile_name)
+                self.accept()  # TODO Do I need still this accept function here?
+                aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
+
+        # if gui_utils.update_profile_settings(self.original_profile_name, profile_settings):
+        #     self.accept()  # TODO Do I need still this accept function here?
+        #     aqt.utils.showInfo(f"Profile {profile_name} was successfully edited", parent=self.parent)
 
     def load_profile_settings(self, profile_name: str, profile_settings):
+        self.original_profile_name = profile_name
         general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
         fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
 
@@ -83,7 +173,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         fields_tab.fields_settings.fields_settings_changed.emit(profile_settings["selected_fields_settings"])
         fields_tab.fields_settings.load_field_settings(fields_tab.fields_setting_combo_box.currentText())
 
-        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
+        self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
         general_tab.generate_as_new_cards_checkbox.setChecked(profile_settings["generate_as_new_cards"])
         general_tab.choose_deck_combo_box.setCurrentText(profile_settings["deck_for_generated_cards"])
         general_tab.add_tag_to_generated_cards_checkbox.setChecked(profile_settings["add_tag_to_generated_cards"])
@@ -91,8 +181,6 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.prompt_text_edit.prompt_text_edit.setPlainText(profile_settings["prompt_text"])
 
         # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
-
-
 
 
 class PromptTextEditLayout(aqt.qt.QWidget):
@@ -122,7 +210,7 @@ class ProfileCreationSettings(aqt.qt.QWidget):
         self.card_types_combo_box = CardTypesComboBox()
         self.fields_selection_check_boxes = FieldsSelectionCheckBoxes()
         self.ai_models_combo_box = AiModelsComboBox()
-        self.ai_model_prices = AiModelPricesLayout()
+        self.ai_model_prices = AiModelPrices()
 
         self.settings_tabs = SettingTabs()
         # self.settings_tabs.setStyleSheet("margin-bottom: 9px")
@@ -270,15 +358,15 @@ class AiModelsComboBox(aqt.qt.QComboBox):
         self.ai_model_switch_signal.emit(model_name)
 
 
-class AiModelPricesLayout(aqt.qt.QGridLayout):
+class AiModelPrices(aqt.qt.QGridLayout):
     def __init__(self, parent: aqt.qt.QWidget | None=None):
         super().__init__(parent)
 
-        input_price_label = aqt.qt.QLabel("Input price:")
-        input_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+        self.input_price_label = aqt.qt.QLabel("Input price:")
+        self.input_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
-        output_price_label = aqt.qt.QLabel("Output price:")
-        output_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+        self.output_price_label = aqt.qt.QLabel("Output price:")
+        self.output_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
         self.input_price_line = aqt.qt.QLineEdit()
         self.input_price_line.setReadOnly(True)
@@ -288,8 +376,8 @@ class AiModelPricesLayout(aqt.qt.QGridLayout):
         self.output_price_line.setReadOnly(True)
         self.output_price_line.setToolTip("Output Price for 1M tokens")
 
-        self.addWidget(input_price_label, 0, 0)
-        self.addWidget(output_price_label, 0, 1)
+        self.addWidget(self.input_price_label, 0, 0)
+        self.addWidget(self.output_price_label, 0, 1)
         self.addWidget(self.input_price_line, 1, 0)
         self.addWidget(self.output_price_line, 1, 1)
 

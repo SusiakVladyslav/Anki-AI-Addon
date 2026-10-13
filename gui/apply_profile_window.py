@@ -3,7 +3,7 @@ from aqt.browser import Browser
 from aqt import mw
 
 from . import gui_utils
-from .create_profile_configuration import ProfileConfigurationDialog
+from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
 
 class ApplyProfileDialog(aqt.qt.QDialog):
     def __init__(self, parent:Browser, profile_name:str):
@@ -24,7 +24,8 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.notes_data_table = NotesDataTable(self, self.selected_notes, self.profile_settings)
         self.commit_buttons = CommitButtons()
 
-        self.profile_edit_buttons.edit_requested.connect(self._show_edit_configuration)
+        self.profile_edit_buttons.edit_requested.connect(self._open_edit_configuration)
+        self.profile_edit_buttons.show_settings_requested.connect(self._open_view_configuration)
 
         self.commit_buttons.commit_buttons_box.rejected.connect(self.reject)
         self.commit_buttons.commit_buttons_box.accepted.connect(self.accept)
@@ -34,11 +35,22 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         grid.addWidget(self.notes_data_table, 1, 0)
         grid.addWidget(self.commit_buttons, 2, 0)
 
-    def _show_edit_configuration(self):
-        edit_configuration_dialog = ProfileConfigurationDialog(self.parent)
+    def _open_edit_configuration(self):
+        edit_configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.EDIT, parent=self.parent)
         edit_configuration_dialog.load_profile_settings(self.profile_name, self.profile_settings)
+        edit_configuration_dialog.profile_name_changed.connect(self.set_new_profile_name)
+        # set current profile name and settings to edited profile name and settings
         edit_configuration_dialog.open()
 
+    def _open_view_configuration(self):
+        view_configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.VIEW, parent=self.parent)
+        view_configuration_dialog.load_profile_settings(self.profile_name, self.profile_settings)
+        view_configuration_dialog.open()
+
+    def set_new_profile_name(self, new_profile_name):
+        self.profile_name = new_profile_name
+        self.profile_settings = gui_utils.get_profile_settings_from_config(self.profile_name)
+        self.profile_edit_buttons.profile_name_label.setText(new_profile_name)
 
 
 class ProfileEditButtons(aqt.qt.QWidget):
@@ -94,7 +106,6 @@ class NotesDataTable(aqt.qt.QWidget):
         original_field_data_and_processed_field_data_columns_per_selected_field = 2 * len(self.selected_fields)
 
         return note_id_and_card_type_columns + original_field_data_and_processed_field_data_columns_per_selected_field
-        return 2 + 2 * len(self.selected_fields)
 
     def _calculate_amount_of_rows(self):
         return len(self.selected_notes)
