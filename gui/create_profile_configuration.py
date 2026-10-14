@@ -1,29 +1,34 @@
-from typing import Any
-
 import aqt.qt
-from aqt.browser import Browser
 from aqt import mw
-from enum import Enum, auto
+
 from typing import Any
+import copy
+from dataclasses import dataclass
 
 from . import gui_utils
-from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES, CONFIG
+from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
 
+class DialogMode:
+    @dataclass
+    class Create:
+        pass
 
-class DialogMode(Enum):
-    CREATE = auto()
-    EDIT = auto()
-    VIEW = auto()
+    @dataclass
+    class Edit:
+        profile_name: str
+        profile_settings: dict[str, Any]
 
+    Type = Create | Edit
 
 class ProfileConfigurationDialog(aqt.qt.QDialog):
     profile_name_changed = aqt.qt.pyqtSignal(str)
 
-    def __init__(self, mode: DialogMode=DialogMode.CREATE, parent=None):
+    def __init__(self, mode: DialogMode.Type, parent=None) -> None:
         super().__init__(parent)
         self.parent = parent
         self.mode = mode
-        self.original_profile_name: str|None = None
+        self.original_profile_name: str | None = None
+        self.config: dict | None = None
 
         self.resize(1200, 800)
         self.setModal(False)
@@ -31,9 +36,9 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
         self.prompt_text_edit = PromptTextEditLayout()
         self.profile_creation_settings = ProfileCreationSettings()
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox()
         # self.prompt_text_edit.setStyleSheet("margin-bottom: 1px")
 
-        self.commit_buttons_box = aqt.qt.QDialogButtonBox()
         self._setup_ui_for_mode()
 
         grid = aqt.qt.QGridLayout(self)
@@ -41,22 +46,20 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         grid.addWidget(self.profile_creation_settings, 0, 1)
         grid.addWidget(self.commit_buttons_box, 1, 1)
 
+        self.connect_widgets_change(self._on_widget_settings_changed)
+
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
-        # self.profile_creation_settings.create_profile_button.clicked.connect(self.get_profile_creation_settings)
+    def _setup_ui_for_mode(self) -> None:
+        match self.mode:
+            case DialogMode.Create:
+                self._setup_create_profile_mode()
+            case DialogMode.Edit(profile_name=edit_name, profile_settings=edit_settings):
+                self._setup_edit_mode(profile_name=edit_name)
+                self.load_profile_settings(profile_name=edit_name, profile_settings=edit_settings)
 
-    def _setup_ui_for_mode(self):
-        if self.mode == DialogMode.CREATE:
-            self._setup_create_profile_mode()
-
-        elif self.mode == DialogMode.EDIT:
-            self._setup_edit_mode()
-
-        elif self.mode == DialogMode.VIEW:
-            self._setup_view_mode()
-
-    def _setup_create_profile_mode(self):
+    def _setup_create_profile_mode(self) -> None:
         self.setWindowTitle("Create Profile")
 
         self.commit_buttons_box = aqt.qt.QDialogButtonBox(
@@ -67,40 +70,50 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.commit_buttons_box.rejected.connect(self.reject)
         self.commit_buttons_box.accepted.connect(self._insert_profile_settings)
 
-    def _setup_edit_mode(self):
-        self.setWindowTitle("Edit Profile: {}")
+    def _setup_edit_mode(self, profile_name: str) -> None:
+        self.setWindowTitle(f"Edit Profile: {profile_name}")
 
         self.commit_buttons_box = aqt.qt.QDialogButtonBox(
             aqt.qt.QDialogButtonBox.StandardButton.Save
             | aqt.qt.QDialogButtonBox.StandardButton.Cancel
         )
+        self.save_button = self.commit_buttons_box.button(aqt.qt.QDialogButtonBox.StandardButton.Save)
+        self.save_button.setEnabled(False)
 
         self.commit_buttons_box.rejected.connect(self.reject)
         self.commit_buttons_box.accepted.connect(self._update_profile_settings)
 
-    def _setup_view_mode(self):
-        self.setWindowTitle("View settings for Profile: {}")
+    def connect_widgets_change(self, slot) -> None:
+        for children in self.findChildren(aqt.qt.QWidget):
+            if isinstance(children, aqt.qt.QAbstractButton):
+                children.toggled.connect(slot)
+            elif isinstance(children, aqt.qt.QComboBox):
+                children.currentIndexChanged.connect(slot)
+            elif isinstance(children, aqt.qt.QLineEdit):
+                children.textChanged.connect(slot)
+            elif isinstance(children, aqt.qt.QPlainTextEdit):
+                children.textChanged.connect(slot)
 
-        self.prompt_text_edit.setEnabled(False)
-        # self.profile_creation_settings.setEnabled(False)
+    def _on_widget_settings_changed(self) -> None:
+        if self.config is None:
+            return
 
-        # self.card_types_combo_box = CardTypesComboBox()
-        # self.fields_selection_check_boxes = FieldsSelectionCheckBoxes()
-        # self.ai_models_combo_box = AiModelsComboBox()
-        # self.ai_model_prices = AiModelPricesLayout()
+        is_changed = self.config != self._collect_profile_settings()
+        self.save_button.setEnabled(is_changed)
 
-        self.profile_creation_settings.card_types_combo_box.setEnabled(False)
-        self.profile_creation_settings.fields_selection_check_boxes.setEnabled(False)
-        self.profile_creation_settings.ai_models_combo_box.setEnabled(False)
+    def reject(self) -> None:
+        if self.confirm_settings_changes_discard():
+            super().reject()
 
-        self.profile_creation_settings.ai_model_prices.input_price_line.setEnabled(False)
-        self.profile_creation_settings.ai_model_prices.input_price_label.setEnabled(False)
-        self.profile_creation_settings.ai_model_prices.output_price_label.setEnabled(False)
-        self.profile_creation_settings.ai_model_prices.output_price_line.setEnabled(False)
-
-        self.profile_creation_settings.settings_tabs.fields_setting_tab.setEnabled(False)
-        self.profile_creation_settings.settings_tabs.general_settings_tab.setEnabled(False)
-        self.profile_creation_settings.settings_tabs.expected_input_and_output.setEnabled(False)
+    def confirm_settings_changes_discard(self) -> bool:
+        if self.config != self._collect_profile_settings():
+            return aqt.utils.askUser(
+                "You have unsaved changes. Discard them and close?",
+                parent=self,
+                title="Unsaved Changes"
+            )
+        else:
+            return True
 
     def _collect_profile_settings(self) -> dict[str, dict[str, Any]]:
         general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
@@ -120,7 +133,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             {
                 "selected_card_type": self.profile_creation_settings.card_types_combo_box.currentText(),
                 "selected_fields": selected_fields,
-                "selected_fields_settings": fields_tab.fields_settings._field_data,
+                "selected_fields_settings": copy.deepcopy(fields_tab.fields_settings._field_data),
                 "selected_model": self.profile_creation_settings.ai_models_combo_box.currentText(),
                 "generate_as_new_cards": generate_as_new_cards,
                 "deck_for_generated_cards": general_tab.choose_deck_combo_box.currentText() if generate_as_new_cards else None,
@@ -130,13 +143,39 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             }
         }
 
-    def _insert_profile_settings(self):
+    def load_profile_settings(self, profile_name: str, profile_settings: dict[str, Any]) -> None:
+        self.config = copy.deepcopy({profile_name: profile_settings})
+        self.original_profile_name = profile_name
+
+        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
+
+        general_tab.enter_profile_name_line_edit.setText(profile_name)
+
+        self.profile_creation_settings.card_types_combo_box.setCurrentText(profile_settings["selected_card_type"])
+        for check_box in self.profile_creation_settings.fields_selection_check_boxes.check_boxes_list:
+            check_box.setChecked(check_box.text() in profile_settings["selected_fields"])
+
+        fields_tab.fields_settings._field_data = copy.deepcopy(profile_settings["selected_fields_settings"])
+        fields_tab.fields_settings.fields_settings_changed.emit(profile_settings["selected_fields_settings"])
+        fields_tab.fields_settings.load_field_settings(fields_tab.fields_setting_combo_box.currentText())
+
+        self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
+        general_tab.generate_as_new_cards_checkbox.setChecked(profile_settings["generate_as_new_cards"])
+        general_tab.choose_deck_combo_box.setCurrentText(profile_settings["deck_for_generated_cards"])
+        general_tab.add_tag_to_generated_cards_checkbox.setChecked(profile_settings["add_tag_to_generated_cards"])
+        general_tab.tag_name_line_edit.setText(profile_settings["tag_name_for_generated_cards"])
+        self.prompt_text_edit.prompt_text_edit.setPlainText(profile_settings["prompt_text"])
+
+        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
+
+    def _insert_profile_settings(self) -> None:
         profile_settings = self._collect_profile_settings()
         if gui_utils.insert_profile_settings_in_config(profile_settings):
             self.accept()
             aqt.utils.showInfo(f"Profile {str(profile_settings.keys())} created", parent=self.parent)
 
-    def _update_profile_settings(self):
+    def _update_profile_settings(self) -> None:
         edited_profile_settings = self._collect_profile_settings()
         edited_profile_name = next(iter(edited_profile_settings))
 
@@ -158,33 +197,9 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         #     self.accept()  # TODO Do I need still this accept function here?
         #     aqt.utils.showInfo(f"Profile {profile_name} was successfully edited", parent=self.parent)
 
-    def load_profile_settings(self, profile_name: str, profile_settings):
-        self.original_profile_name = profile_name
-        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
-        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
-
-        general_tab.enter_profile_name_line_edit.setText(profile_name)
-
-        self.profile_creation_settings.card_types_combo_box.setCurrentText(profile_settings["selected_card_type"])
-        for check_box in self.profile_creation_settings.fields_selection_check_boxes.check_boxes_list:
-            check_box.setChecked(check_box.text() in profile_settings["selected_fields"])
-
-        fields_tab.fields_settings._field_data = profile_settings["selected_fields_settings"]
-        fields_tab.fields_settings.fields_settings_changed.emit(profile_settings["selected_fields_settings"])
-        fields_tab.fields_settings.load_field_settings(fields_tab.fields_setting_combo_box.currentText())
-
-        self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
-        general_tab.generate_as_new_cards_checkbox.setChecked(profile_settings["generate_as_new_cards"])
-        general_tab.choose_deck_combo_box.setCurrentText(profile_settings["deck_for_generated_cards"])
-        general_tab.add_tag_to_generated_cards_checkbox.setChecked(profile_settings["add_tag_to_generated_cards"])
-        general_tab.tag_name_line_edit.setText(profile_settings["tag_name_for_generated_cards"])
-        self.prompt_text_edit.prompt_text_edit.setPlainText(profile_settings["prompt_text"])
-
-        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
-
 
 class PromptTextEditLayout(aqt.qt.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         grid = aqt.qt.QGridLayout(self)
@@ -204,7 +219,7 @@ class PromptTextEditLayout(aqt.qt.QWidget):
 
 
 class ProfileCreationSettings(aqt.qt.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         self.card_types_combo_box = CardTypesComboBox()
@@ -236,23 +251,23 @@ class ProfileCreationSettings(aqt.qt.QWidget):
         grid.addWidget(self.settings_tabs, 3, 0, 1, 2)
         # self.addWidget(self.create_profile_button, 4, 0, 1, 2)
 
-    def _send_initial_signals(self):
+    def _send_initial_signals(self) -> None:
         self.card_types_combo_box.on_card_type_switch()
         self.ai_models_combo_box.on_ai_model_switch()
         self.fields_selection_check_boxes.on_check_box_toggled()
 
 
-    def _update_fields_selection_check_boxes_on_card_type_switch(self):
+    def _update_fields_selection_check_boxes_on_card_type_switch(self) -> None:
         self.card_types_combo_box.card_type_switch_signal.connect(
             self.fields_selection_check_boxes.create_field_check_boxes
         )
 
-    def _reset_fields_settings_on_card_type_switch(self):
+    def _reset_fields_settings_on_card_type_switch(self) -> None:
         self.card_types_combo_box.card_type_switch_signal.connect(
             self.settings_tabs.fields_setting_tab.fields_settings.clear_field_data
         )
 
-    def _update_ai_model_prices_on_ai_model_switch(self):
+    def _update_ai_model_prices_on_ai_model_switch(self) -> None:
         self.ai_models_combo_box.ai_model_switch_signal.connect(
             self.ai_model_prices.set_input_price
         )
@@ -261,17 +276,17 @@ class ProfileCreationSettings(aqt.qt.QWidget):
             self.ai_model_prices.set_output_price
         )
 
-    def _update_expected_io_text_edits_on_selected_fields_toggle(self):
+    def _update_expected_io_text_edits_on_selected_fields_toggle(self) -> None:
         self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
             self.settings_tabs.expected_input_and_output.update_text_edits
         )
 
-    def _update_fields_setting_combo_box_on_selected_fields_toggle(self):
+    def _update_fields_setting_combo_box_on_selected_fields_toggle(self) -> None:
         self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
             self.settings_tabs.fields_setting_tab.fields_setting_combo_box.set_fields_to_combo_box
         )
 
-    def _update_fields_settings_on_selected_fields_toggle(self):
+    def _update_fields_settings_on_selected_fields_toggle(self) -> None:
         self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
             self.settings_tabs.fields_setting_tab.fields_settings.sync_with_selected_fields
         )
@@ -280,13 +295,13 @@ class ProfileCreationSettings(aqt.qt.QWidget):
 class CardTypesComboBox(aqt.qt.QComboBox):
     card_type_switch_signal = aqt.qt.pyqtSignal(list)
 
-    def __init__(self, parent: aqt.qt.QWidget | None=None):
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
 
         self.currentIndexChanged.connect(self.on_card_type_switch)
         self.addItems(mw.col.models.all_names())
 
-    def on_card_type_switch(self):
+    def on_card_type_switch(self) -> None:
         card_type_str = str(self.currentText())
 
         card_type_id = mw.col.models.by_name(card_type_str)
@@ -298,7 +313,7 @@ class CardTypesComboBox(aqt.qt.QComboBox):
 class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
     selected_fields_toggle_signal = aqt.qt.pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         grid = aqt.qt.QGridLayout(self)
@@ -316,7 +331,7 @@ class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
 
         grid.addWidget(self.scroll_area, 0, 0)
 
-    def create_field_check_boxes(self, fields_list):
+    def create_field_check_boxes(self, fields_list) -> None: # TODO ADD type hint
         self.clear_field_check_boxes()
 
         for field in fields_list:
@@ -330,7 +345,7 @@ class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
 
         self.on_check_box_toggled()
 
-    def clear_field_check_boxes(self):
+    def clear_field_check_boxes(self) -> None:
         while self.fields_check_boxes_vertical_layout.count():
             item = self.fields_check_boxes_vertical_layout.takeAt(0)
             widget = item.widget()
@@ -339,7 +354,7 @@ class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
                 widget.deleteLater()
         self.check_boxes_list.clear()
 
-    def on_check_box_toggled(self):
+    def on_check_box_toggled(self) -> None:
         self.fields_status = {cb.text(): cb.isChecked() for cb in self.check_boxes_list}
         self.selected_fields_toggle_signal.emit(self.fields_status)
 
@@ -347,19 +362,19 @@ class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
 class AiModelsComboBox(aqt.qt.QComboBox):
     ai_model_switch_signal = aqt.qt.pyqtSignal(str)
 
-    def __init__(self, parent: aqt.qt.QWidget | None=None):
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
 
         self.addItems(AVAILABLE_MODELS)
         self.currentIndexChanged.connect(self.on_ai_model_switch)
 
-    def on_ai_model_switch(self):
+    def on_ai_model_switch(self) -> None:
         model_name = str(self.currentText())
         self.ai_model_switch_signal.emit(model_name)
 
 
 class AiModelPrices(aqt.qt.QGridLayout):
-    def __init__(self, parent: aqt.qt.QWidget | None=None):
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
 
         self.input_price_label = aqt.qt.QLabel("Input price:")
@@ -381,17 +396,17 @@ class AiModelPrices(aqt.qt.QGridLayout):
         self.addWidget(self.input_price_line, 1, 0)
         self.addWidget(self.output_price_line, 1, 1)
 
-    def set_input_price(self, model_name: str):
+    def set_input_price(self, model_name: str) -> None:
         input_price = MODELS_INPUT_PRICES[model_name]
         self.input_price_line.setText(gui_utils.decide_price_format(input_price) + "$")
 
-    def set_output_price(self, model_name: str):
+    def set_output_price(self, model_name: str) -> None:
         output_price = MODELS_OUTPUT_PRICES[model_name]
         self.output_price_line.setText(gui_utils.decide_price_format(output_price) + "$")
 
 
 class SettingTabs(aqt.qt.QTabWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         self.setting_widget = aqt.qt.QWidget()
@@ -407,7 +422,7 @@ class SettingTabs(aqt.qt.QTabWidget):
 
 
 class ExpectedInputAndOutput(aqt.qt.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         field_layout = aqt.qt.QGridLayout(self)
@@ -451,7 +466,7 @@ class ExpectedInputAndOutput(aqt.qt.QWidget):
         field_layout.addWidget(self.expected_fields_input_to_ai_text_edit, 1, 0)
         field_layout.addWidget(self.expected_output_from_ai_text_edit, 1, 1)
 
-    def update_text_edits(self, fields_status: dict[str, bool]):
+    def update_text_edits(self, fields_status: dict[str, bool]) -> None:
         selected_fields = [field for field, value in fields_status.items() if value]
         input_text = "".join(f"{field}|{{Field Data}}\n" for field in selected_fields)
         output_text = "".join(f"{field}|{{Generated Data}}\n" for field in selected_fields)
@@ -461,7 +476,7 @@ class ExpectedInputAndOutput(aqt.qt.QWidget):
 
 
 class FieldsSettingsTab(aqt.qt.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         grid = aqt.qt.QGridLayout(self)
@@ -492,7 +507,7 @@ class FieldsSettingsTab(aqt.qt.QWidget):
 
 
 class FieldsSettingsComboBox(aqt.qt.QComboBox):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
     def set_fields_to_combo_box(self, fields_status: dict[str, bool]) -> None:
@@ -509,7 +524,7 @@ class FieldsSettingsComboBox(aqt.qt.QComboBox):
 class FieldsSettings(aqt.qt.QWidget):
     fields_settings_changed = aqt.qt.pyqtSignal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         v_layout = aqt.qt.QVBoxLayout(self)
@@ -533,7 +548,7 @@ class FieldsSettings(aqt.qt.QWidget):
 
         v_layout.setSpacing(12)
 
-    def _update_fields_data(self):
+    def _update_fields_data(self) -> None:
         if not self._current_field:
             return
 
@@ -545,7 +560,7 @@ class FieldsSettings(aqt.qt.QWidget):
 
         self.fields_settings_changed.emit(self._field_data)
 
-    def sync_with_selected_fields(self, fields_status: dict[str, bool]):
+    def sync_with_selected_fields(self, fields_status: dict[str, bool]) -> None:
         new_fields_data = {}  # New dict is created, so items are sorted in the same way as in fields_status
 
         for field, checked in fields_status.items():
@@ -564,7 +579,7 @@ class FieldsSettings(aqt.qt.QWidget):
         self._field_data = new_fields_data
         self.fields_settings_changed.emit(self._field_data)
 
-    def clear_field_data(self):
+    def clear_field_data(self) -> None:
         self._field_data.clear()
 
         self._block_signals_to_check_boxes(True)
@@ -577,12 +592,12 @@ class FieldsSettings(aqt.qt.QWidget):
 
         self.fields_settings_changed.emit(self._field_data)
 
-    def _block_signals_to_check_boxes(self, state: bool):
+    def _block_signals_to_check_boxes(self, state: bool) -> None:
         self.strip_html_check_box.blockSignals(state)
         self.strip_brackets_check_box.blockSignals(state)
         self.strip_non_ascii_check_box.blockSignals(state)
 
-    def load_field_settings(self, new_selected_field: str):
+    def load_field_settings(self, new_selected_field: str) -> None:
         if new_selected_field in self._field_data.keys():
             self._current_field = new_selected_field
             self.fields_setting_label.setText(f"{self._current_field} Field Settings:")
@@ -599,7 +614,7 @@ class FieldsSettings(aqt.qt.QWidget):
 
 
 class FieldsSettingsTable(aqt.qt.QTableWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         self.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -613,7 +628,7 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
 
         self.verticalHeader().hide()
 
-    def load_fields_setting_data(self, fields_setting_data: dict[str, dict[str, bool]]):
+    def load_fields_setting_data(self, fields_setting_data: dict[str, dict[str, bool]]) -> None:
         selected_fields = [field for field in fields_setting_data.keys()]
         selected_fields_length = len(selected_fields)
         self.setRowCount(selected_fields_length)
@@ -633,7 +648,7 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
 
 
 class GeneralSettingsTab(aqt.qt.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         main_layout = aqt.qt.QHBoxLayout(self)
@@ -691,7 +706,7 @@ class GeneralSettingsTab(aqt.qt.QWidget):
         self._switch_other_widgets_opacity(self.generate_as_new_cards_checkbox.isChecked())
         self._switch_add_tag_widget_opacity(self.add_tag_to_generated_cards_checkbox.isChecked())
 
-    def _create_opacity_effects(self):
+    def _create_opacity_effects(self) -> None:
         self.widgets_with_opacity_effect = [
             self.choose_deck_label,
             self.choose_deck_combo_box,
@@ -706,7 +721,7 @@ class GeneralSettingsTab(aqt.qt.QWidget):
             self.opacity_effects_list.append(effect)
             widget.setGraphicsEffect(effect)
 
-    def _switch_other_widgets_opacity(self, checked: bool):
+    def _switch_other_widgets_opacity(self, checked: bool) -> None:
         widget_and_opacity_effect_tuple = zip(
             self.widgets_with_opacity_effect[0:3], self.opacity_effects_list[0:3]
         )
@@ -719,7 +734,7 @@ class GeneralSettingsTab(aqt.qt.QWidget):
             if not checked and isinstance(widget, aqt.qt.QCheckBox):
                 widget.setChecked(False)
 
-    def _switch_add_tag_widget_opacity(self, checked: bool):
+    def _switch_add_tag_widget_opacity(self, checked: bool) -> None:
         widget_and_opacity_effect_tuple = zip(
             self.widgets_with_opacity_effect[3:], self.opacity_effects_list[3:]
         )
@@ -732,6 +747,6 @@ class GeneralSettingsTab(aqt.qt.QWidget):
             if not checked and isinstance(widget, aqt.qt.QLineEdit):
                 widget.clear()
 
-    def _add_deck_names_to_the_combo_box(self):
+    def _add_deck_names_to_the_combo_box(self) -> None:
         deck_names: list[str] = mw.col.decks.all_names()
         self.choose_deck_combo_box.addItems(deck_names)

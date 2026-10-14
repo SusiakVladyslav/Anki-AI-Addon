@@ -25,7 +25,8 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.commit_buttons = CommitButtons()
 
         self.profile_edit_buttons.edit_requested.connect(self._open_edit_configuration)
-        self.profile_edit_buttons.show_settings_requested.connect(self._open_view_configuration)
+        self.profile_edit_buttons.delete_requested.connect(self.delete_profile)
+        self.profile_edit_buttons.duplicate_requested.connect(self.duplicate_profile)
 
         self.commit_buttons.commit_buttons_box.rejected.connect(self.reject)
         self.commit_buttons.commit_buttons_box.accepted.connect(self.accept)
@@ -36,25 +37,46 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         grid.addWidget(self.commit_buttons, 2, 0)
 
     def _open_edit_configuration(self):
-        edit_configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.EDIT, parent=self.parent)
-        edit_configuration_dialog.load_profile_settings(self.profile_name, self.profile_settings)
+        edit_configuration_dialog = ProfileConfigurationDialog(
+            mode=DialogMode.Edit(profile_name=self.profile_name, profile_settings=self.profile_settings),
+            parent=self.parent
+        )
+        # edit_configuration_dialog.load_profile_settings(self.profile_name, self.profile_settings)
         edit_configuration_dialog.profile_name_changed.connect(self.set_new_profile_name)
-        # set current profile name and settings to edited profile name and settings
         edit_configuration_dialog.open()
 
-    def _open_view_configuration(self):
-        view_configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.VIEW, parent=self.parent)
-        view_configuration_dialog.load_profile_settings(self.profile_name, self.profile_settings)
-        view_configuration_dialog.open()
+    def delete_profile(self):
+        deletion_confirmed: bool = aqt.utils.askUser(
+            f'Are you sure you want to delete profile "{self.profile_name}"?',
+            parent=self.parent,
+            title="Confirm Deletion"
+        )
+
+        if deletion_confirmed:
+            gui_utils.delete_profile_from_config(self.profile_name)
+            aqt.utils.showInfo(f"Profile {self.profile_name} was successfully deleted")
+            self.accept()
+
+    def duplicate_profile(self):
+        duplication_confirmed: bool = aqt.utils.askUser(
+            f'Are you sure you want to create profile "{self.profile_name} (Duplicate)"?',
+            parent=self.parent,
+            title="Confirm Duplicate"
+        )
+
+        if duplication_confirmed:
+            profile_settings = gui_utils.get_profile_settings_from_config(self.profile_name)
+            duplicate_settings = {self.profile_name + " " + "(Duplicate)": profile_settings}
+            if gui_utils.insert_profile_settings_in_config(duplicate_settings):
+                aqt.utils.showInfo(f'Profile "{self.profile_name} (Duplicate)" was successfully created')
 
     def set_new_profile_name(self, new_profile_name):
         self.profile_name = new_profile_name
         self.profile_settings = gui_utils.get_profile_settings_from_config(self.profile_name)
-        self.profile_edit_buttons.profile_name_label.setText(new_profile_name)
+        self.profile_edit_buttons.profile_name_label.setText(f"Profile: {new_profile_name}")
 
 
 class ProfileEditButtons(aqt.qt.QWidget):
-    show_settings_requested = aqt.qt.pyqtSignal()
     edit_requested = aqt.qt.pyqtSignal()
     delete_requested = aqt.qt.pyqtSignal()
     duplicate_requested = aqt.qt.pyqtSignal()
@@ -63,12 +85,10 @@ class ProfileEditButtons(aqt.qt.QWidget):
         super().__init__(parent)
 
         self.profile_name_label = aqt.qt.QLabel(f"Profile:{profile_name}")
-        self.show_settings_button = aqt.qt.QPushButton("Show Settings")
         self.edit_button = aqt.qt.QPushButton("Edit")
         self.delete_button = aqt.qt.QPushButton("Delete")
         self.duplicate_button = aqt.qt.QPushButton("Duplicate")
 
-        self.show_settings_button.clicked.connect(self.show_settings_requested)
         self.edit_button.clicked.connect(self.edit_requested)
         self.delete_button.clicked.connect(self.delete_requested)
         self.duplicate_button.clicked.connect(self.duplicate_requested)
@@ -76,7 +96,6 @@ class ProfileEditButtons(aqt.qt.QWidget):
         h_layout = aqt.qt.QHBoxLayout(self)
 
         h_layout.addWidget(self.profile_name_label)
-        h_layout.addWidget(self.show_settings_button)
         h_layout.addWidget(self.edit_button)
         h_layout.addWidget(self.delete_button)
         h_layout.addWidget(self.duplicate_button)
@@ -93,13 +112,43 @@ class NotesDataTable(aqt.qt.QWidget):
 
         self.table = aqt.qt.QTableWidget()
 
+        self.table.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setColumnCount(self._calculate_amount_of_cols())
         self.table.setRowCount(self._calculate_amount_of_rows())
+
         self._set_columns_names()
         self._populate_table()
+        self._configure_table_view()
 
         grid = aqt.qt.QGridLayout(self)
         grid.addWidget(self.table, 0, 0)
+
+    def _configure_table_view(self):
+        self.table.setShowGrid(True)
+        self.table.setGridStyle(aqt.qt.Qt.PenStyle.SolidLine)
+        self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet("""
+                    QTableWidget {
+                        gridline-color: #777777;
+                    }
+                    QTableWidget::item {
+                        padding: 6px;
+                    }
+                """)
+
+        header = self.table.horizontalHeader()
+        v_header = self.table.verticalHeader()
+
+        self.table.setWordWrap(True)
+
+        header.setSectionResizeMode(0, aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
+
+        for col in range(2, self.table.columnCount()):
+            header.setSectionResizeMode(col, aqt.qt.QHeaderView.ResizeMode.Interactive)
+            self.table.setColumnWidth(col, 250)
+
+        v_header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
 
     def _calculate_amount_of_cols(self):
         note_id_and_card_type_columns = 2

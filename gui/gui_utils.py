@@ -91,6 +91,12 @@ def sort_profiles_dict(original_profile_name: str, edited_profile_settings_dict:
     return new_profiles_dict
 
 
+def delete_profile_from_config(profile_name: str):
+    profiles = CONFIG.setdefault("Profiles", {})
+    profiles.pop(profile_name)
+
+    mw.addonManager.writeConfig(ADDON_PACKAGE, CONFIG)
+
 def get_profile_settings_from_config(profile_name: str) -> dict[str, type]:
     profile_settings = CONFIG.get("Profiles")[profile_name]
     return profile_settings

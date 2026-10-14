@@ -28,7 +28,7 @@ def populate_ai_generation_profiles_menu(browser: Browser, generation_profiles_m
     generation_profiles_menu.addAction(create_profile_action)
 
 def open_configuration_dialog(browser: Browser, generation_profiles_menu) -> None:
-    configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.CREATE, parent=browser)
+    configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.Create, parent=browser)
     configuration_dialog.accepted.connect(lambda: populate_ai_generation_profiles_menu(browser, generation_profiles_menu))
     configuration_dialog.open()
 
