@@ -21,7 +21,7 @@ class DialogMode:
     Type = Create | Edit
 
 class ProfileConfigurationDialog(aqt.qt.QDialog):
-    profile_name_changed = aqt.qt.pyqtSignal(str)
+    profile_settings_changed = aqt.qt.pyqtSignal(dict)
 
     def __init__(self, mode: DialogMode.Type, parent=None) -> None:
         super().__init__(parent)
@@ -181,6 +181,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
         if self.original_profile_name == edited_profile_name:
             if gui_utils.update_profile_settings_name(edited_profile_settings, profile_name_was_edited=False):
+                self.profile_settings_changed.emit(edited_profile_settings)
                 self.accept()  # TODO Do I need still this accept function here?
                 aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
         else:
@@ -189,7 +190,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
                 profile_name_was_edited=True,
                 original_profile_name=self.original_profile_name
             ):
-                self.profile_name_changed.emit(edited_profile_name)
+                self.profile_settings_changed.emit(edited_profile_settings)
                 self.accept()  # TODO Do I need still this accept function here?
                 aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
 

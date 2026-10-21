@@ -50,7 +50,7 @@ def setup_profile_buttons(browser: Browser, generation_profiles_menu: QMenu) -> 
 def open_apply_profile_dialog(browser: Browser, profile_name: str, generation_profiles_menu) -> None:
     apply_profile_dialog = ApplyProfileDialog(browser, profile_name)
     apply_profile_dialog.finished.connect(lambda: populate_ai_generation_profiles_menu(browser, generation_profiles_menu))
-    apply_profile_dialog.open()
+    apply_profile_dialog.show()
 
 def populate_my_addon_menu(browser: Browser, my_menu: QMenu) -> None:
     action = QAction("Generate sentences for selected Korean Notes", browser)

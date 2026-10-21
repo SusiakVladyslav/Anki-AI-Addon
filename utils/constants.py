@@ -10,7 +10,8 @@ CONFIG = mw.addonManager.getConfig(ADDON_PACKAGE)
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY")
 MODEL: Final = CONFIG.get("Model")
 
-AI_URL: Final = "https://api.openai.com/v1/responses"
+# AI_URL: Final = "https://api.openai.com/v1/responses"
+AI_URL: Final = "https://api.openai.com/v1/chat/completions"
 EMPTY_LINE: Final = "<br><br>"
 
 AVAILABLE_MODELS = (

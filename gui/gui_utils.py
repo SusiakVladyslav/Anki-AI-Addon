@@ -1,9 +1,12 @@
 import aqt.utils
 from aqt import mw
 from aqt.browser import Browser
-from typing import Any
 
 from anki.notes import Note
+
+from typing import Any
+import html
+import re
 
 from ..utils.constants import CONFIG, ADDON_PACKAGE
 
@@ -128,3 +131,40 @@ def get_selected_notes(browser: Browser) -> list[Note]:
     selected_notes = [mw.col.get_note(note_id) for note_id in selected_notes_id]
 
     return selected_notes
+
+# 1. Match <style> and <script> blocks with their inner content
+_STYLE_SCRIPT_RE = re.compile(
+    r"<(style|script)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL
+)
+
+# 2. Match both opening AND closing block-level tags (including <summary> and <details>)
+_BLOCK_TAG_RE = re.compile(
+    r"</?(?:br|div|p|li|tr|td|th|summary|details|h[1-6]|blockquote|section|article|header|footer|hr|ul|ol|table|dl|dt|dd)\b[^>]*>",
+    re.IGNORECASE,
+)
+
+# 3. Match any remaining inline tags (<span>, <b>, <i>, <a>, <ruby>, etc.)
+_INLINE_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def strip_html(text: str) -> str:
+    if not text:
+        return ""
+
+    # 1. Remove <style> and <script> blocks completely
+    cleaned = _STYLE_SCRIPT_RE.sub("", text)
+
+    # 2. Replace all block-level tags (opening and closing) with a newline
+    cleaned = _BLOCK_TAG_RE.sub("\n", cleaned)
+
+    # 3. Remove inline tags WITHOUT adding spaces (keeps "대학생<span>치고서</span>" attached)
+    cleaned = _INLINE_TAG_RE.sub("", cleaned)
+
+    # 4. Decode HTML entities (&nbsp;, &lt;, &gt;, &amp;) AFTER tags are removed
+    cleaned = html.unescape(cleaned)
+
+    # 5. Normalize non-breaking spaces (\xa0) and strip empty lines
+    cleaned = cleaned.replace("\xa0", " ")
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+
+    return "\n".join(lines)
