@@ -60,8 +60,8 @@ def send_open_ai_request(input_data: str, prompt: str, model: str, selected_fiel
     }
 
     formatted_input = (
-        f"<user_prompt>\n{prompt.strip()}\n</user_prompt>\n\n"
-        f"<input_notes>\n{input_data.strip()}\n</input_notes>"
+        f"\n<user_prompt>\n{prompt.strip()}\n</user_prompt>\n"
+        f"\n<input_notes>\n{input_data.strip()}\n</input_notes>\n\n"
     )
 
     data = {

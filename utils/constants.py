@@ -1,11 +1,18 @@
-import aqt.utils
 from aqt import mw
+
+import os
 from typing import Final
 
 ADDON_PACKAGE = mw.addonManager.addon_from_module(__name__)
 CONFIG = mw.addonManager.getConfig(ADDON_PACKAGE)
 
-# mw.addonManager.writeConfig(__name__, config)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_DIR)
+
+EYE_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye.svg")
+EYE_OFF_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye_off.svg")
+
+AVAILABLE_COMPANIES = ["OpenAI", "Claude", "Gemini", "DeepSeek"]
 
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY")
 MODEL: Final = CONFIG.get("Model")

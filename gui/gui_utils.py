@@ -168,3 +168,24 @@ def strip_html(text: str) -> str:
     lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
 
     return "\n".join(lines)
+
+def get_colored_icon(svg_path: str, color: aqt.qt.QColor) -> aqt.qt.QIcon:
+    pixmap = aqt.qt.QPixmap(svg_path)
+    painter = aqt.qt.QPainter(pixmap)
+    painter.setCompositionMode(aqt.qt.QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(pixmap.rect(), color)
+    painter.end()
+    return aqt.qt.QIcon(pixmap)
+
+def convert_company_name_to_api_key(company_name: str) -> str:
+    match company_name:
+        case "OpenAI":
+            return "OPENAI_API_KEY"
+        case "Claude":
+            return "CLAUDE_API_KEY"
+        case "Gemini":
+            return "GEMINI_API_KEY"
+        case "DeepSeek":
+            return "DEEPSEEK_API_KEY"
+        case _:
+            return ""
