@@ -8,7 +8,16 @@ from typing import Any
 import html
 import re
 
-from ..utils.constants import CONFIG, ADDON_PACKAGE
+from ..utils.constants import (
+    CONFIG,
+    ADDON_PACKAGE,
+    OPENAI_ICON_PATH,
+    CLAUDE_ICON_PATH,
+    GEMINI_ICON_PATH,
+    DEEPSEEK_ICON_PATH,
+    MODELS_INPUT_PRICES,
+    MODELS_OUTPUT_PRICES
+)
 
 
 def insert_profile_settings_in_config(profile_settings_dict: dict[str, dict[str, Any]]):
@@ -189,3 +198,32 @@ def convert_company_name_to_api_key(company_name: str) -> str:
             return "DEEPSEEK_API_KEY"
         case _:
             return ""
+
+def get_company_icon(company_name: str) -> aqt.qt.QIcon:
+    anki_text_color = aqt.mw.palette().color(aqt.qt.QPalette.ColorRole.Text)
+
+    company_to_icon = {
+        "OpenAI": get_colored_icon(OPENAI_ICON_PATH, anki_text_color),
+        "Claude": aqt.qt.QIcon(CLAUDE_ICON_PATH),
+        "Gemini": aqt.qt.QIcon(GEMINI_ICON_PATH),
+        "DeepSeek": aqt.qt.QIcon(DEEPSEEK_ICON_PATH)
+    }
+
+    return company_to_icon[company_name]
+
+def model_to_company_name(model: str) -> str:
+    if "gpt" in model.lower():
+        return "OpenAI"
+    if "gemini" in model.lower():
+        return "Gemini"
+    else:
+        return "DeepSeek"
+
+def calculate_spent_money(input_tokens: int, output_tokens: int, model: str) -> tuple[float, float, float]:
+    price_per_1_million_input_tokens = MODELS_INPUT_PRICES[model]
+    price_per_1_million_output_tokens = MODELS_OUTPUT_PRICES[model]
+    money_spent_on_input = (input_tokens / 1000000) * price_per_1_million_input_tokens
+    money_spent_on_output = (output_tokens / 1000000) * price_per_1_million_output_tokens
+    total_money_spent = money_spent_on_input + money_spent_on_output
+
+    return money_spent_on_input, money_spent_on_output, total_money_spent

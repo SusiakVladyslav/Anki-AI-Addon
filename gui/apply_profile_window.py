@@ -224,7 +224,7 @@ class NotesDataTable(aqt.qt.QWidget):
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
 
-    def extract_processed_data_from_table(self) -> str:
+    def extract_processed_data_from_table(self) -> list[dict[str, str]]:
         notes = []
 
         for row in range(self.table.rowCount()):
@@ -236,7 +236,7 @@ class NotesDataTable(aqt.qt.QWidget):
 
             notes.append(notes_data)
 
-        return json.dumps(notes, indent=2)
+        return notes
 
 
 

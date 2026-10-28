@@ -1,5 +1,52 @@
+import aqt
+from aqt.qt import QDialog
 from aqt.browser import Browser
 from aqt.utils import showInfo, showWarning, showCritical
+
+
+def show_successful_notes_creation(creation_deck: str, amount_of_notes: int, parent: Browser) -> None:
+    showInfo(
+        f"{amount_of_notes} new notes were successfully created!\n"
+        f'You can find them in the deck "{creation_deck}"',
+        parent=parent
+    )
+
+
+def show_successful_notes_replacement(parent: Browser) -> None:
+    showInfo(
+        f"Selected notes were successfully enhanced!\n",
+        parent=parent
+    )
+
+
+def successful_notes_generation(
+        time_spent: float,
+        input_tokens: int,
+        output_tokens: int,
+        money_spent_on_input: float,
+        money_spent_on_output: float,
+        total_money_spent: float,
+        ai_model: str,
+        parent: Browser
+) -> None:
+    # self.browser.onSearchActivated()
+    # if self.browser.editor.note:
+    #     self.browser.editor.loadNote()
+
+    showInfo(
+        f"Notes were successfully generated!\n"
+        f"Time spent: {time_spent:.3f} seconds\n"
+        f"\n"
+        f"Input tokens used: {input_tokens}\n"
+        f"Output tokens used: {output_tokens}\n"
+        f"\n"
+        f"Money spent on input {money_spent_on_input:.5f}$\n"
+        f"Money spent on output {money_spent_on_output:.5f}$\n"
+        f"Total money spent {total_money_spent:.5f}$\n"
+        f"\n"
+        f"Model: {ai_model}",
+        parent=parent
+    )
 
 
 def more_than_one_note_type_selected_warning() -> None:

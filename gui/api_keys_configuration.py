@@ -2,7 +2,7 @@ import aqt
 from aqt import mw
 
 from . import gui_utils
-from ..utils.constants import EYE_ICON_PATH, EYE_OFF_ICON_PATH, CONFIG, AVAILABLE_COMPANIES, ADDON_PACKAGE
+from ..utils.constants import EYE_ICON_PATH, EYE_OFF_ICON_PATH, OPENAI_ICON_PATH, CONFIG, AVAILABLE_COMPANIES, ADDON_PACKAGE
 
 class ApiKeysConfigurationDialog(aqt.qt.QDialog):
     def __init__(self, parent=None):
@@ -39,7 +39,10 @@ class ApiKeysConfigurationDialog(aqt.qt.QDialog):
         for company_name in AVAILABLE_COMPANIES:
             company_tab_widget = CompanyTabWidget(company_name=company_name)
             self.companies_widgets[company_name] = company_tab_widget
-            self.companies_tab.addTab(company_tab_widget, company_name)
+
+            company_icon = gui_utils.get_company_icon(company_name)
+
+            self.companies_tab.addTab(company_tab_widget, company_icon, company_name)
 
     def _get_companies_api_keys(self):
         self.companies_api_keys = dict()

@@ -12,6 +12,11 @@ ROOT_DIR = os.path.dirname(CURRENT_DIR)
 EYE_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye.svg")
 EYE_OFF_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye_off.svg")
 
+OPENAI_ICON_PATH = os.path.join(ROOT_DIR, "icons", "openai_logo.svg")
+CLAUDE_ICON_PATH = os.path.join(ROOT_DIR, "icons", "claude_logo.svg")
+GEMINI_ICON_PATH = os.path.join(ROOT_DIR, "icons", "gemini_logo.svg")
+DEEPSEEK_ICON_PATH = os.path.join(ROOT_DIR, "icons", "deepseek_logo.svg")
+
 AVAILABLE_COMPANIES = ["OpenAI", "Claude", "Gemini", "DeepSeek"]
 
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY")
@@ -27,9 +32,8 @@ AVAILABLE_MODELS = (
     "gpt-5.6-luna",
     "gpt-5.5",
     "gpt-5.4",
-    "gpt-5.2",
-    "gpt-5.1",
-    "gpt-5-mini"
+    "gemini-4-argon",
+    "gemini-3.8-flash"
 )
 
 MODELS_INPUT_PRICES = {
@@ -38,10 +42,8 @@ MODELS_INPUT_PRICES = {
     "gpt-5.6-luna": 0.10,
     "gpt-5.5": 2.50,
     "gpt-5.4": 1.25,
-    "gpt-5.2": 0.875,
-    "gpt-5.1": 0.625,
-    "gpt-5": 0.625,
-    "gpt-5-mini": 0.125
+    "gemini-4-argon": 2.00,
+    "gemini-3.8-flash": 0.75,
 }
 
 MODELS_OUTPUT_PRICES = {
@@ -50,11 +52,44 @@ MODELS_OUTPUT_PRICES = {
     "gpt-5.6-luna": 0.60,
     "gpt-5.5": 15.00,
     "gpt-5.4": 7.50,
-    "gpt-5.2": 7.00,
-    "gpt-5.1": 5.00,
-    "gpt-5": 5.00,
-    "gpt-5-mini": 1.00
+    "gemini-4-argon": 10.00,
+    "gemini-3.8-flash": 3.75,
 }
+
+# AVAILABLE_MODELS = (
+#     "gpt-5.6-sol",
+#     "gpt-5.6-terra",
+#     "gpt-5.6-luna",
+#     "gpt-5.5",
+#     "gpt-5.4",
+#     "gpt-5.2",
+#     "gpt-5.1",
+#     "gpt-5-mini"
+# )
+#
+# MODELS_INPUT_PRICES = {
+#     "gpt-5.6-sol": 2.50,
+#     "gpt-5.6-terra": 1.00,
+#     "gpt-5.6-luna": 0.10,
+#     "gpt-5.5": 2.50,
+#     "gpt-5.4": 1.25,
+#     "gpt-5.2": 0.875,
+#     "gpt-5.1": 0.625,
+#     "gpt-5": 0.625,
+#     "gpt-5-mini": 0.125
+# }
+#
+# MODELS_OUTPUT_PRICES = {
+#     "gpt-5.6-sol": 15.00,
+#     "gpt-5.6-terra": 6.00,
+#     "gpt-5.6-luna": 0.60,
+#     "gpt-5.5": 15.00,
+#     "gpt-5.4": 7.50,
+#     "gpt-5.2": 7.00,
+#     "gpt-5.1": 5.00,
+#     "gpt-5": 5.00,
+#     "gpt-5-mini": 1.00
+# }
 
 
 PROMPT = """

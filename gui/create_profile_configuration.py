@@ -366,8 +366,14 @@ class AiModelsComboBox(aqt.qt.QComboBox):
     def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
 
-        self.addItems(AVAILABLE_MODELS)
+        self.add_models()
         self.currentIndexChanged.connect(self.on_ai_model_switch)
+
+    def add_models(self):
+        for model in AVAILABLE_MODELS:
+            company = gui_utils.model_to_company_name(model)
+            icon = gui_utils.get_company_icon(company)
+            self.addItem(icon, model)
 
     def on_ai_model_switch(self) -> None:
         model_name = str(self.currentText())
