@@ -3,11 +3,11 @@ from aqt.browser import Browser
 from aqt import mw
 
 from typing import Any
-import json
 
 from . import gui_utils
 from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
 from ..utils.profile_service import ProfileService
+from . import style
 
 
 class ApplyProfileDialog(aqt.qt.QDialog):
@@ -47,7 +47,6 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         profile_service = ProfileService(browser=self.parent, profile_settings=self.profile_settings)
         profile_service.apply_profile(parent=self, input_data=input_data, selected_notes=self.selected_notes)
         self.accept()
-
 
     def _open_edit_configuration(self):
         self.edit_configuration_dialog = ProfileConfigurationDialog(
@@ -108,7 +107,17 @@ class ProfileEditButtons(aqt.qt.QWidget):
     def __init__(self, profile_name:str, parent=None):
         super().__init__(parent)
 
-        self.profile_name_label = aqt.qt.QLabel(f"Profile:{profile_name}")
+        self.setStyleSheet(f"""
+            QLabel {{
+                font-size: {style.APPLY_PROFILE_LABEL_FONT_SIZE}pt;
+            }}
+            QPushButton {{
+                font-size: {style.APPLY_PROFILE_BUTTONS_FONT_SIZE}pt;
+            }}
+        """)
+
+        self.profile_name_label = aqt.qt.QLabel(f'Profile: "{profile_name}"')
+
         self.edit_button = aqt.qt.QPushButton("Edit")
         self.delete_button = aqt.qt.QPushButton("Delete")
         self.duplicate_button = aqt.qt.QPushButton("Duplicate")
@@ -155,14 +164,19 @@ class NotesDataTable(aqt.qt.QWidget):
         self.table.setShowGrid(True)
         self.table.setGridStyle(aqt.qt.Qt.PenStyle.SolidLine)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet("""
-                    QTableWidget {
-                        gridline-color: #777777;
-                    }
-                    QTableWidget::item {
-                        padding: 6px;
-                    }
-                """)
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                gridline-color: #777777;
+                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+            }}
+            QTableWidget::item {{
+                padding: {style.TABLE_ITEM_PADDING}px;
+                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+            }}
+            QHeaderView::section {{
+                font-size: {style.QTABLEWIDGET_HEADER_FONT_SIZE}pt;
+            }}
+        """)
 
         self.header = self.table.horizontalHeader()
         self.v_header = self.table.verticalHeader()
@@ -173,18 +187,59 @@ class NotesDataTable(aqt.qt.QWidget):
         self.header.setSectionResizeMode(1, aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
 
         for col in range(2, self.table.columnCount()):
-            self.header.setSectionResizeMode(col, aqt.qt.QHeaderView.ResizeMode.Interactive)
-            self.table.setColumnWidth(col, 250)
+            self.table.setColumnWidth(col, style.TABLE_COLUMN_WIDTH)
 
-        self.v_header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
+        for row in range(self.table.rowCount()):
+            font = self.table.font()
+            font.setPointSize(style.QTABLEWIDGET_FONT_SIZE)
+            font_metrics = aqt.qt.QFontMetrics(font)
+
+            required_height_for_row = self.calculate_row_height(row, font_metrics)
+            self.table.setRowHeight(
+                row, min(required_height_for_row, style.TABLE_MAX_ROW_HEIGHT)
+            )
+
+        self.header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
+        self.v_header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
+
+
+    def calculate_row_height(self, row, font_metrics):
+        required_height_for_row = 0
+
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            cell_text = item.text()
+
+            # There is padding of other widgets that are hard to control, so to account for that extra space is added
+            extra_safety_space = style.EXTRA_SAFETY_SPACE_PADDING
+
+            usable_width = self.table.columnWidth(col) - (style.TABLE_ITEM_PADDING * 2) - extra_safety_space
+            bounding_rect = font_metrics.boundingRect(
+                0, 0, usable_width, 10000, aqt.qt.Qt.TextFlag.TextWordWrap, cell_text
+            )
+
+            required_height_for_cell = bounding_rect.height() + (style.TABLE_ITEM_PADDING * 2) + extra_safety_space
+
+            if required_height_for_cell > required_height_for_row:
+                required_height_for_row = required_height_for_cell
+
+        return required_height_for_row
+
 
     def _calculate_amount_of_cols(self):
+        """
+        First two columns are dedicated for note id and card type.
+        Each field in selected_fields represents two columns:
+            First is the original data from the field
+            Second is the processed data with the strip settings.
+        """
         note_id_and_card_type_columns = 2
-        original_field_data_and_processed_field_data_columns_per_selected_field = 2 * len(self.selected_fields)
+        original_and_processed_columns = 2 * len(self.selected_fields)
 
-        return note_id_and_card_type_columns + original_field_data_and_processed_field_data_columns_per_selected_field
+        return note_id_and_card_type_columns + original_and_processed_columns
 
     def _calculate_amount_of_rows(self):
+        """Each row represents one note selected for enhancement."""
         return len(self.selected_notes)
 
     def _set_columns_names(self):

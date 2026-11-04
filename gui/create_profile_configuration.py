@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from . import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
+from . import style
 
 class DialogMode:
     @dataclass
@@ -207,6 +208,8 @@ class PromptTextEditLayout(aqt.qt.QWidget):
 
         self.prompt_label = aqt.qt.QLabel("Prompt")
         self.prompt_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        self.setStyleSheet(f"""QLabel {{font-size: {style.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
 
         self.prompt_text_edit = aqt.qt.QPlainTextEdit()
         self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
