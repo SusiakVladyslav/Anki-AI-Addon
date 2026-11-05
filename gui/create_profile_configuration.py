@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from . import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
 from . import style
+from . import dialogs
 
 class DialogMode:
     @dataclass
@@ -38,7 +39,6 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.prompt_text_edit = PromptTextEditLayout()
         self.profile_creation_settings = ProfileCreationSettings()
         self.commit_buttons_box = aqt.qt.QDialogButtonBox()
-        # self.prompt_text_edit.setStyleSheet("margin-bottom: 1px")
 
         self._setup_ui_for_mode()
 
@@ -171,33 +171,47 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
 
     def _insert_profile_settings(self) -> None:
-        profile_settings = self._collect_profile_settings()
-        if gui_utils.insert_profile_settings_in_config(profile_settings):
+        profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
+        profile_name = next(iter(profile))
+
+        if profile_name == "":
+            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            return
+
+        if gui_utils.profile_name_is_too_long(profile):
+            dialogs.profile_name_is_too_long_warning(profile_name, parent=self.parent)
+            return
+
+        if gui_utils.insert_profile_settings_in_config(profile):
             self.accept()
-            aqt.utils.showInfo(f"Profile {str(profile_settings.keys())} created", parent=self.parent)
+            dialogs.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
 
     def _update_profile_settings(self) -> None:
-        edited_profile_settings = self._collect_profile_settings()
-        edited_profile_name = next(iter(edited_profile_settings))
+        edited_profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
+        edited_profile_name = next(iter(edited_profile))
+
+        if edited_profile_name == "":
+            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            return
+
+        if gui_utils.profile_name_is_too_long(edited_profile):
+            dialogs.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
+            return
 
         if self.original_profile_name == edited_profile_name:
-            if gui_utils.update_profile_settings_name(edited_profile_settings, profile_name_was_edited=False):
-                self.profile_settings_changed.emit(edited_profile_settings)
+            if gui_utils.update_profile_settings_name(edited_profile, profile_name_was_edited=False):
+                self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
+                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
         else:
             if gui_utils.update_profile_settings_name(
-                edited_profile_settings,
+                edited_profile,
                 profile_name_was_edited=True,
                 original_profile_name=self.original_profile_name
             ):
-                self.profile_settings_changed.emit(edited_profile_settings)
+                self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                aqt.utils.showInfo(f"Profile {edited_profile_name} was successfully edited", parent=self.parent)
-
-        # if gui_utils.update_profile_settings(self.original_profile_name, profile_settings):
-        #     self.accept()  # TODO Do I need still this accept function here?
-        #     aqt.utils.showInfo(f"Profile {profile_name} was successfully edited", parent=self.parent)
+                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
 
 
 class PromptTextEditLayout(aqt.qt.QWidget):

@@ -1,3 +1,4 @@
+import aqt.theme
 import aqt.qt
 from aqt.browser import Browser
 from aqt import mw
@@ -8,6 +9,7 @@ from . import gui_utils
 from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
 from ..utils.profile_service import ProfileService
 from . import style
+from . import dialogs
 
 
 class ApplyProfileDialog(aqt.qt.QDialog):
@@ -44,8 +46,14 @@ class ApplyProfileDialog(aqt.qt.QDialog):
     def apply_to_notes(self):
         input_data = self.notes_data_table.extract_processed_data_from_table()
 
+        selected_notes_with_correct_card_type = []
+        for note in self.selected_notes:
+            note_card_type = mw.col.models.get(note.mid)["name"]
+            if note_card_type == self.profile_settings["selected_card_type"]:
+                selected_notes_with_correct_card_type.append(note)
+
         profile_service = ProfileService(browser=self.parent, profile_settings=self.profile_settings)
-        profile_service.apply_profile(parent=self, input_data=input_data, selected_notes=self.selected_notes)
+        profile_service.apply_profile(parent=self, input_data=input_data, selected_notes=selected_notes_with_correct_card_type)
         self.accept()
 
     def _open_edit_configuration(self):
@@ -69,17 +77,9 @@ class ApplyProfileDialog(aqt.qt.QDialog):
             self.accept()
 
     def duplicate_profile(self):
-        duplication_confirmed: bool = aqt.utils.askUser(
-            f'Are you sure you want to create profile "{self.profile_name} (Duplicate)"?',
-            parent=self.parent,
-            title="Confirm Duplicate"
-        )
+        dialog = DuplicateProfileDialog(self.profile_name, self)
+        dialog.show()
 
-        if duplication_confirmed:
-            profile_settings = gui_utils.get_profile_settings_from_config(self.profile_name)
-            duplicate_settings = {self.profile_name + " " + "(Duplicate)": profile_settings}
-            if gui_utils.insert_profile_settings_in_config(duplicate_settings):
-                aqt.utils.showInfo(f'Profile "{self.profile_name} (Duplicate)" was successfully created')
 
     def load_edited_settings(self, new_profile_settings):
         self.profile_name = next(iter(new_profile_settings))
@@ -98,6 +98,56 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.notes_data_table._populate_table()
         self.notes_data_table._configure_table_view()
 
+
+class DuplicateProfileDialog(aqt.qt.QDialog):
+    def __init__(self, profile_name: str, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Duplicate Profile")
+        self.resize(375, 100)
+
+        self.original_profile_name = profile_name
+
+        v_layout = aqt.qt.QVBoxLayout(self)
+
+        v_layout.addStretch(1)
+
+        self.label = aqt.qt.QLabel(
+            f"Enter a name for the duplicated profile (max {style.PROFILE_NAME_MAX_LENGTH} characters):"
+        )
+        v_layout.addWidget(self.label)
+
+        self.line_edit = aqt.qt.QLineEdit()
+        self.line_edit.setText(f"{profile_name} (Duplicate)")
+        v_layout.addWidget(self.line_edit)
+
+        v_layout.addStretch(1)
+
+        self.button_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Ok | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
+        v_layout.addWidget(self.button_box)
+
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+    def accept(self):
+        duplicate_profile_name = self.line_edit.text()
+
+        if duplicate_profile_name == "":
+            dialogs.profile_name_cant_be_empty_warning(parent=self)
+            return
+
+        if len(duplicate_profile_name) > style.PROFILE_NAME_MAX_LENGTH:
+            dialogs.profile_name_is_too_long_warning(duplicate_profile_name, parent=self)
+            return
+
+        original_profile_settings = gui_utils.get_profile_settings_from_config(self.original_profile_name)
+        duplicate_settings = {duplicate_profile_name: original_profile_settings}
+
+        if gui_utils.insert_profile_settings_in_config(duplicate_settings):
+            super().accept()
+            dialogs.profile_was_successfully_created(duplicate_profile_name, parent=self)
 
 class ProfileEditButtons(aqt.qt.QWidget):
     edit_requested = aqt.qt.pyqtSignal()
@@ -166,7 +216,7 @@ class NotesDataTable(aqt.qt.QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                gridline-color: #777777;
+                gridline-color:  {style.GRAY_GRIDLINE_COLOR};
                 font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QTableWidget::item {{
@@ -202,12 +252,13 @@ class NotesDataTable(aqt.qt.QWidget):
         self.header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
         self.v_header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
 
-
     def calculate_row_height(self, row, font_metrics):
         required_height_for_row = 0
 
         for col in range(self.table.columnCount()):
             item = self.table.item(row, col)
+            if item is None:
+                continue
             cell_text = item.text()
 
             # There is padding of other widgets that are hard to control, so to account for that extra space is added
@@ -224,7 +275,6 @@ class NotesDataTable(aqt.qt.QWidget):
                 required_height_for_row = required_height_for_cell
 
         return required_height_for_row
-
 
     def _calculate_amount_of_cols(self):
         """
@@ -252,28 +302,47 @@ class NotesDataTable(aqt.qt.QWidget):
     def _populate_table(self):
         for row in range(self.table.rowCount()):
             note = self.selected_notes[row]
+            note_card_type = mw.col.models.get(note.mid)["name"]
             note_id_item = aqt.qt.QTableWidgetItem(str(note.id))
-            note_card_type_item = aqt.qt.QTableWidgetItem(mw.col.models.get(note.mid)["name"])
+            note_card_type_item = aqt.qt.QTableWidgetItem(note_card_type)
 
             self.table.setItem(row, 0, note_id_item)
             self.table.setItem(row, 1, note_card_type_item)
 
             col = 2
 
-            for field_name, field_data in note.items():
-                if field_name in self.selected_fields:
-                    original_data_item = aqt.qt.QTableWidgetItem(str(field_data))
+            for field_name in self.selected_fields:
+                if note_card_type == self.profile_settings["selected_card_type"]:
+                    field_data = note[field_name] if field_name in note else ""
+                else:
+                    field_data = ""
 
-                    if self.selected_fields_settings[field_name]["strip_html"]:
-                        processed_data_item = aqt.qt.QTableWidgetItem(
-                            gui_utils.strip_html(str(field_data))
-                        )
-                    else:
-                        processed_data_item = aqt.qt.QTableWidgetItem(str(field_data))
+                original_data_item = aqt.qt.QTableWidgetItem(str(field_data))
 
-                    self.table.setItem(row, col, original_data_item)
-                    self.table.setItem(row, col + 1, processed_data_item)
-                    col += 2
+                if self.selected_fields_settings.get(field_name, {}).get("strip_html", False):
+                    processed_data_item = aqt.qt.QTableWidgetItem(
+                        gui_utils.strip_html(str(field_data))
+                    )
+                else:
+                    processed_data_item = aqt.qt.QTableWidgetItem(str(field_data))
+
+                self.table.setItem(row, col, original_data_item)
+                self.table.setItem(row, col + 1, processed_data_item)
+                col += 2
+
+            if note_card_type != self.profile_settings["selected_card_type"]:
+                self._highlight_row_as_invalid(row)
+
+    def _highlight_row_as_invalid(self, row: int) -> None:
+        if aqt.theme.theme_manager.night_mode:
+            red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR_DARK)
+        else:
+            red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR_LIGHT)
+
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            if item:
+                item.setBackground(red_color)
 
     def clear_table(self):
         self.table.setRowCount(0)
@@ -283,6 +352,10 @@ class NotesDataTable(aqt.qt.QWidget):
         notes = []
 
         for row in range(self.table.rowCount()):
+            card_type_column = self.table.item(row, 1).text()
+            if card_type_column != self.profile_settings["selected_card_type"]:
+                continue
+
             notes_data = dict()
 
             for col, field_name in zip(range(3, self.table.columnCount(), 2), self.selected_fields):

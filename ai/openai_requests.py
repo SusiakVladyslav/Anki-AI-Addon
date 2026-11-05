@@ -42,6 +42,14 @@ def send_open_ai_request(input_data: str, prompt: str, model: str, selected_fiel
       }
     ]
     
+    HTML FORMATTING RULES:
+    - You may use basic HTML tags for card styling and structure 
+      (e.g., <b>bold</b>, <i>italics</i>, <u>underline</u>, <br> for line breaks, 
+      <ul>/<li> for lists, and <span style="color: ..."> for highlighting).
+    - Do not wrap content in <html>, <body>, or markdown code blocks (```html). 
+      Return raw inline HTML strings inside the JSON fields.
+    - Keep HTML clean, minimal, and semantic so cards render properly in Anki's reviewer.
+    
     OUTPUT FORMAT:
     Return a JSON object containing a "generated_notes" key containing the array of modified cards.
     Maintain the exact field keys for each note object as defined in the schema.
@@ -54,7 +62,8 @@ def send_open_ai_request(input_data: str, prompt: str, model: str, selected_fiel
     field_properties = {
         field: {
             "type": "string",
-            "description": f"Generated content for the '{field}' Anki field. Use <br> for line breaks.",
+            "description": f"Generated content for the '{field}' Anki field. "
+                           f"Clean HTML tags (like <b>, <i>, <br>, <ul>, <li>, <span>) are allowed for formatting.",
         }
         for field in selected_fields
     }

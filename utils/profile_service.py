@@ -202,7 +202,7 @@ class PreviewTableDialog(aqt.qt.QDialog):
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                gridline-color: #777777;
+                gridline-color: {style.GRAY_GRIDLINE_COLOR};
                 font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QTableWidget::item {{

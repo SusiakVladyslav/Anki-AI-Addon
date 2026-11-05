@@ -3,6 +3,8 @@ from aqt.qt import QDialog
 from aqt.browser import Browser
 from aqt.utils import showInfo, showWarning, showCritical
 
+from . import style
+
 
 def show_successful_notes_creation(creation_deck: str, amount_of_notes: int, parent: Browser) -> None:
     showInfo(
@@ -29,9 +31,6 @@ def successful_notes_generation(
         ai_model: str,
         parent: Browser
 ) -> None:
-    # self.browser.onSearchActivated()
-    # if self.browser.editor.note:
-    #     self.browser.editor.loadNote()
 
     showInfo(
         f"Notes were successfully generated!\n"
@@ -48,6 +47,18 @@ def successful_notes_generation(
         parent=parent
     )
 
+def profile_name_is_too_long_warning(profile_name: str, parent) -> None:
+    showWarning(f'Profile name "{profile_name}" is longer than {style.PROFILE_NAME_MAX_LENGTH} characters. '
+                f'Please write a shorter profile name.', parent=parent)
+
+def profile_name_cant_be_empty_warning(parent) -> None:
+    showWarning("Profile name cannot be empty. Please enter valid profile name.", parent=parent)
+
+def profile_was_successfully_created(profile_name: str, parent) -> None:
+    showInfo(f'Profile "{profile_name}" was successfully created', parent=parent)
+
+def profile_was_successfully_edited(profile_name: str, parent) -> None:
+    showInfo(f'Profile "{profile_name}" was successfully edited', parent=parent)
 
 def more_than_one_note_type_selected_warning() -> None:
     showWarning("More than 1 note type selected")

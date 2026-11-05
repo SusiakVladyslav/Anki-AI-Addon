@@ -8,6 +8,8 @@ from typing import Any
 import html
 import re
 
+from . import dialogs
+from . import style
 from ..utils.constants import (
     CONFIG,
     ADDON_PACKAGE,
@@ -227,3 +229,21 @@ def calculate_spent_money(input_tokens: int, output_tokens: int, model: str) -> 
     total_money_spent = money_spent_on_input + money_spent_on_output
 
     return money_spent_on_input, money_spent_on_output, total_money_spent
+
+def profile_name_is_too_long(profile: dict[str, dict[str, Any]]) -> bool:
+    profile_name = next(iter(profile))
+    if len(profile_name) > style.PROFILE_NAME_MAX_LENGTH:
+        return True
+
+    return False
+
+def calculate_longest_profile_width(menu: aqt.qt.QMenu, profile_names: list[str]) -> int:
+    font_metrics = aqt.qt.QFontMetrics(menu.font())
+    longest_profile_width = 0
+
+    for profile_name in profile_names:
+        profile_width = font_metrics.horizontalAdvance(profile_name)
+        if profile_width > longest_profile_width:
+            longest_profile_width = profile_width
+
+    return longest_profile_width
