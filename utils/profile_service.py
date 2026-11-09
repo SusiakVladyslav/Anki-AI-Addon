@@ -38,7 +38,7 @@ class ProfileService:
             success=lambda ai_output: self.show_preview_table(ai_output=ai_output, selected_notes=selected_notes, selected_fields=self.selected_fields)
         )
 
-        op.with_progress("AI is generating sentences...").run_in_background()
+        op.with_progress("AI is generating data for enhancement...").run_in_background()
 
     def show_preview_table(self, ai_output: AiOutput, selected_notes, selected_fields):
         preview_table_dialog = PreviewTableDialog(parent=self.browser, ai_output=ai_output, selected_notes=selected_notes, selected_fields=selected_fields)
@@ -135,6 +135,10 @@ class PreviewTableDialog(aqt.qt.QDialog):
             aqt.qt.QDialogButtonBox.StandardButton.Ok
             | aqt.qt.QDialogButtonBox.StandardButton.Cancel
         )
+
+        ok_button = self.commit_buttons_box.button(aqt.qt.QDialogButtonBox.StandardButton.Ok)
+        if ok_button:
+            ok_button.setText("Confirm")
 
         self.commit_buttons_box.rejected.connect(self.reject)
         self.commit_buttons_box.accepted.connect(self.accept)

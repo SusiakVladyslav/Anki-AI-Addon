@@ -231,7 +231,9 @@ class PromptTextEditLayout(aqt.qt.QWidget):
         self.prompt_text_edit = aqt.qt.QPlainTextEdit()
         self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
         self.prompt_text_edit.setPlaceholderText("Enter your prompt here")
-        self.prompt_text_edit.setToolTip("")  # TODO: Write a proper tool tip for prompt text edit
+        self.prompt_text_edit.setToolTip(
+            "Enter instructions in text edit to guide AI how to enhance your cards."
+        )
 
         grid.addWidget(self.prompt_label, 0, 0)
         grid.addWidget(self.prompt_text_edit, 1, 0)
@@ -318,6 +320,7 @@ class CardTypesComboBox(aqt.qt.QComboBox):
 
     def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
+        self.setToolTip("Choose card type for the profile")
 
         self.currentIndexChanged.connect(self.on_card_type_switch)
         self.addItems(mw.col.models.all_names())
@@ -358,6 +361,9 @@ class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
         for field in fields_list:
             check_box = aqt.qt.QCheckBox(str(field))
             check_box.toggled.connect(self.on_check_box_toggled)
+            check_box.setToolTip(
+                "Choose which card fields you want to send to AI for the enhancement"
+            )
 
             self.fields_check_boxes_vertical_layout.addWidget(check_box)
             self.check_boxes_list.append(check_box)
@@ -385,6 +391,9 @@ class AiModelsComboBox(aqt.qt.QComboBox):
 
     def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
         super().__init__(parent)
+        self.setToolTip(
+            "Select which AI model will be used for notes enhancement"
+        )
 
         self.add_models()
         self.currentIndexChanged.connect(self.on_ai_model_switch)
@@ -412,11 +421,19 @@ class AiModelPrices(aqt.qt.QGridLayout):
 
         self.input_price_line = aqt.qt.QLineEdit()
         self.input_price_line.setReadOnly(True)
-        self.input_price_line.setToolTip("Input Price for 1M tokens")  # TODO is tool tips good enough?
+        self.input_price_line.setToolTip(
+            "Input price for 1 million tokens\n"
+            "In English, 1 token is roughly 4 characters.\n"
+            "Other languages/scripts may consume more tokens per word."
+        )
 
         self.output_price_line = aqt.qt.QLineEdit()
         self.output_price_line.setReadOnly(True)
-        self.output_price_line.setToolTip("Output Price for 1M tokens")
+        self.output_price_line.setToolTip(
+            "Output price for 1 million tokens\n"
+            "In English, 1 token is roughly 4 characters.\n"
+            "Other languages/scripts may consume more tokens per word."
+        )
 
         self.addWidget(self.input_price_label, 0, 0)
         self.addWidget(self.output_price_label, 0, 1)
@@ -454,7 +471,7 @@ class ExpectedInputAndOutput(aqt.qt.QWidget):
 
         field_layout = aqt.qt.QGridLayout(self)
 
-        expected_input_label = aqt.qt.QLabel("Expected input for AI is:")  # # TODO Is label text good enough?
+        expected_input_label = aqt.qt.QLabel("Expected input for AI is:")
         expected_input_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
         expected_output_label = aqt.qt.QLabel("Expected output from AI is:")
@@ -464,7 +481,7 @@ class ExpectedInputAndOutput(aqt.qt.QWidget):
         self.font.setPointSize(12)
 
         self.expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
-        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")  # TODO Is tooltip good enough?
+        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")
         self.expected_fields_input_to_ai_text_edit.setReadOnly(True)
 
         self.expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
@@ -536,6 +553,7 @@ class FieldsSettingsTab(aqt.qt.QWidget):
 class FieldsSettingsComboBox(aqt.qt.QComboBox):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setToolTip("Select field to configure cleanup settings for")
 
     def set_fields_to_combo_box(self, fields_status: dict[str, bool]) -> None:
         previous_selection = self.currentText()
@@ -560,17 +578,34 @@ class FieldsSettings(aqt.qt.QWidget):
         self._current_field = ""
 
         self.fields_setting_label = aqt.qt.QLabel("All Fields Settings:")
-        self.strip_html_check_box = aqt.qt.QCheckBox("Strip HTML in fields")
-        self.strip_brackets_check_box = aqt.qt.QCheckBox("Strip brackets in fields")
-        self.strip_non_ascii_check_box = aqt.qt.QCheckBox("Strip non-ascii characters in fields")
+        self.strip_html_check_box = aqt.qt.QCheckBox("Strip HTML tags in fields")
+        self.strip_brackets_check_box = aqt.qt.QCheckBox("Strip square brackets in fields")
+        self.convert_cloze_check_box = aqt.qt.QCheckBox("Convert cloze to plain text")
+        self.strip_non_ascii_check_box = aqt.qt.QCheckBox("Strip Non-ASCII characters in fields")
+
+        self.strip_html_check_box.setToolTip(
+            "Remove HTML formatting tags (such as &lt;b&gt;, &lt;i&gt;, &lt;br&gt;, or &lt;font&gt;) to send clean plain text to the AI and save tokens."
+        )
+        self.strip_brackets_check_box.setToolTip(
+            "Remove square brackets and their contents (e.g., [...]) "
+            "to prevent cluttering or sending Anki media tags (like [sound:...]) to the AI."
+        )
+        self.convert_cloze_check_box.setToolTip(
+            "Convert cloze to plain text (e.g. Converts {{c1 :: Paris}} to Paris)"
+        )
+        self.strip_non_ascii_check_box.setToolTip(
+            "Remove non-standard characters, emojis, and special symbols, keeping only basic Latin letters, numbers, and punctuation."
+        )
 
         self.strip_html_check_box.toggled.connect(self._update_fields_data)
         self.strip_brackets_check_box.toggled.connect(self._update_fields_data)
+        self.convert_cloze_check_box.toggled.connect(self._update_fields_data)
         self.strip_non_ascii_check_box.toggled.connect(self._update_fields_data)
 
         v_layout.addWidget(self.fields_setting_label)
         v_layout.addWidget(self.strip_html_check_box)
         v_layout.addWidget(self.strip_brackets_check_box)
+        v_layout.addWidget(self.convert_cloze_check_box)
         v_layout.addWidget(self.strip_non_ascii_check_box)
 
         v_layout.setSpacing(12)
@@ -582,6 +617,7 @@ class FieldsSettings(aqt.qt.QWidget):
         self._field_data[self._current_field] = {
             "strip_html" : self.strip_html_check_box.isChecked(),
             "strip_brackets" : self.strip_brackets_check_box.isChecked(),
+            "convert_cloze" : self.convert_cloze_check_box.isChecked(),
             "strip_non_ascii" : self.strip_non_ascii_check_box.isChecked()
         }
 
@@ -600,6 +636,7 @@ class FieldsSettings(aqt.qt.QWidget):
                 new_fields_data[field] = {
                     "strip_html": False,
                     "strip_brackets": False,
+                    "convert_cloze": False,
                     "strip_non_ascii": False
                 }
 
@@ -613,6 +650,7 @@ class FieldsSettings(aqt.qt.QWidget):
 
         self.strip_html_check_box.setChecked(False)
         self.strip_brackets_check_box.setChecked(False)
+        self.convert_cloze_check_box.setChecked(False)
         self.strip_non_ascii_check_box.setChecked(False)
 
         self._block_signals_to_check_boxes(False)
@@ -622,6 +660,7 @@ class FieldsSettings(aqt.qt.QWidget):
     def _block_signals_to_check_boxes(self, state: bool) -> None:
         self.strip_html_check_box.blockSignals(state)
         self.strip_brackets_check_box.blockSignals(state)
+        self.convert_cloze_check_box.blockSignals(state)
         self.strip_non_ascii_check_box.blockSignals(state)
 
     def load_field_settings(self, new_selected_field: str) -> None:
@@ -633,9 +672,10 @@ class FieldsSettings(aqt.qt.QWidget):
 
             self._block_signals_to_check_boxes(True)
 
-            self.strip_html_check_box.setChecked(settings["strip_html"])
-            self.strip_brackets_check_box.setChecked(settings["strip_brackets"])
-            self.strip_non_ascii_check_box.setChecked(settings["strip_non_ascii"])
+            self.strip_html_check_box.setChecked(settings.get("strip_html", False))
+            self.strip_brackets_check_box.setChecked(settings.get("strip_brackets", False))
+            self.convert_cloze_check_box.setChecked(settings.get("convert_cloze", False))
+            self.strip_non_ascii_check_box.setChecked(settings.get("strip_non_ascii", False))
 
             self._block_signals_to_check_boxes(False)
 
@@ -646,8 +686,8 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
 
         self.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
 
-        self.setColumnCount(4)
-        self.setHorizontalHeaderLabels(['Field Name', 'Strip HTML', 'Strip brackets', 'Strip non-ascii'])
+        self.setColumnCount(5)
+        self.setHorizontalHeaderLabels(['Field Name', 'Strip HTML', 'Strip Brackets', 'Convert Cloze', 'Strip Non-ASCII'])
 
         self.horizontalHeader().setSectionResizeMode(
             aqt.qt.QHeaderView.ResizeMode.Stretch
@@ -666,11 +706,11 @@ class FieldsSettingsTable(aqt.qt.QTableWidget):
 
             field_settings = fields_setting_data[field_name]
 
-            for col_index, strip_setting in enumerate(("strip_html", "strip_brackets", "strip_non_ascii"), start=1):
+            for col_index, strip_setting in enumerate(("strip_html", "strip_brackets", "convert_cloze", "strip_non_ascii"), start=1):
                 self.setItem(
                     row_index,
                     col_index,
-                    gui_utils.create_table_check_item(checked=field_settings[strip_setting])
+                    gui_utils.create_table_check_item(checked=field_settings.get(strip_setting, False))
                 )
 
 
@@ -685,16 +725,16 @@ class GeneralSettingsTab(aqt.qt.QWidget):
         left_layout = aqt.qt.QVBoxLayout()
         left_layout.setSpacing(0)
 
-        self.generate_as_new_cards_checkbox = aqt.qt.QCheckBox("Generate data as a new cards")
+        self.generate_as_new_cards_checkbox = aqt.qt.QCheckBox("Create new notes from generated data")
 
-        self.choose_deck_label = aqt.qt.QLabel("Choose deck to save generated cards in:")
+        self.choose_deck_label = aqt.qt.QLabel("Save generated notes to deck:")
         self.choose_deck_combo_box = aqt.qt.QComboBox()
-        self.choose_deck_combo_box.setFixedWidth(220)
+        self.choose_deck_combo_box.setFixedWidth(235)
 
-        self.add_tag_to_generated_cards_checkbox = aqt.qt.QCheckBox("Add tag to generated cards")
+        self.add_tag_to_generated_cards_checkbox = aqt.qt.QCheckBox("Add tag to generated notes")
         self.enter_tag_name_label = aqt.qt.QLabel("Enter tag name:")
         self.tag_name_line_edit = aqt.qt.QLineEdit()
-        self.tag_name_line_edit.setFixedWidth(220)
+        self.tag_name_line_edit.setFixedWidth(235)
 
         left_layout.addWidget(self.generate_as_new_cards_checkbox)
         left_layout.addSpacing(15)
@@ -712,7 +752,7 @@ class GeneralSettingsTab(aqt.qt.QWidget):
         right_layout = aqt.qt.QVBoxLayout()
         right_layout.setSpacing(8)
 
-        self.enter_profile_name_label = aqt.qt.QLabel("Enter profile name:")
+        self.enter_profile_name_label = aqt.qt.QLabel("Profile name:")
         self.enter_profile_name_line_edit = aqt.qt.QLineEdit()
         self.enter_profile_name_line_edit.setFixedWidth(220)
 

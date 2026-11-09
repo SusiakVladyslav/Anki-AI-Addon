@@ -178,6 +178,36 @@ def strip_html(text: str) -> str:
 
     return "\n".join(lines)
 
+
+def strip_square_brackets(text: str) -> str:
+    # Match only square brackets [...] across multiple lines
+    pattern = r"\[[^\]]*\]"
+    cleaned_text = re.sub(pattern, "", text, flags=re.DOTALL)
+
+    # Clean up any leftover double spaces
+    cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip()
+
+    return cleaned_text
+
+def convert_cloze_to_plain_text(text: str):
+    pattern = r"\{\{c\d+::([^:#\}]+)(?:::[^\}]*)?\}\}"
+    return re.sub(pattern, r"\1", text)
+
+def get_processed_text(field_data: str, field_strip_settings: dict[str, bool]) -> str:
+    processed_field_data = field_data
+
+    if field_strip_settings.get("strip_html", False):
+        processed_field_data = strip_html(processed_field_data)
+    if field_strip_settings.get("strip_brackets", False):
+        processed_field_data = strip_square_brackets(processed_field_data)
+    if field_strip_settings.get("convert_cloze", False):
+        processed_field_data = convert_cloze_to_plain_text(processed_field_data)
+    if field_strip_settings.get("strip_non_ascii", False):
+        # Encodes the string to ASCII ignoring non-ASCII characters and then decodes back to string
+        processed_field_data = processed_field_data.encode("ascii", "ignore").decode("ascii")
+
+    return processed_field_data
+
 def get_colored_icon(svg_path: str, color: aqt.qt.QColor) -> aqt.qt.QIcon:
     pixmap = aqt.qt.QPixmap(svg_path)
     painter = aqt.qt.QPainter(pixmap)

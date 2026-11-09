@@ -300,6 +300,7 @@ class NotesDataTable(aqt.qt.QWidget):
         for row in range(self.table.rowCount()):
             note = self.selected_notes[row]
             note_card_type = mw.col.models.get(note.mid)["name"]
+
             note_id_item = aqt.qt.QTableWidgetItem(str(note.id))
             note_card_type_item = aqt.qt.QTableWidgetItem(note_card_type)
 
@@ -310,18 +311,14 @@ class NotesDataTable(aqt.qt.QWidget):
 
             for field_name in self.selected_fields:
                 if note_card_type == self.profile_settings["selected_card_type"]:
-                    field_data = note[field_name] if field_name in note else ""
+                    field_data: str = note[field_name] if field_name in note else ""
                 else:
                     field_data = ""
 
-                original_data_item = aqt.qt.QTableWidgetItem(str(field_data))
+                field_strip_settings: dict = self.selected_fields_settings.get(field_name, {})
 
-                if self.selected_fields_settings.get(field_name, {}).get("strip_html", False):
-                    processed_data_item = aqt.qt.QTableWidgetItem(
-                        gui_utils.strip_html(str(field_data))
-                    )
-                else:
-                    processed_data_item = aqt.qt.QTableWidgetItem(str(field_data))
+                original_data_item = aqt.qt.QTableWidgetItem(field_data)
+                processed_data_item = aqt.qt.QTableWidgetItem(gui_utils.get_processed_text(field_data, field_strip_settings))
 
                 self.table.setItem(row, col, original_data_item)
                 self.table.setItem(row, col + 1, processed_data_item)
