@@ -1,0 +1,819 @@
+import aqt.qt
+from aqt import mw
+
+from typing import Any
+import copy
+from dataclasses import dataclass
+
+from . import gui_utils
+from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
+from . import style
+from . import dialogs
+
+class DialogMode:
+    @dataclass
+    class Create:
+        pass
+
+    @dataclass
+    class Edit:
+        profile_name: str
+        profile_settings: dict[str, Any]
+
+    Type = Create | Edit
+
+class ProfileConfigurationDialog(aqt.qt.QDialog):
+    profile_settings_changed = aqt.qt.pyqtSignal(dict)
+
+    def __init__(self, mode: DialogMode.Type, parent=None) -> None:
+        super().__init__(parent)
+        self.parent = parent
+        self.mode = mode
+        self.original_profile_name: str | None = None
+
+        self.resize(1200, 800)
+        self.setModal(False)
+        self.setSizeGripEnabled(True)
+
+        self.prompt_text_edit = PromptTextEditLayout()
+        self.profile_creation_settings = ProfileCreationSettings()
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox()
+
+        self.config = self._collect_profile_settings()
+
+        self._setup_ui_for_mode()
+
+        grid = aqt.qt.QGridLayout(self)
+        grid.addWidget(self.prompt_text_edit, 0, 0)
+        grid.addWidget(self.profile_creation_settings, 0, 1)
+        grid.addWidget(self.commit_buttons_box, 1, 1)
+
+        if isinstance(self.mode, DialogMode.Edit):
+            self.connect_widgets_change(self._on_widget_settings_changed)
+
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+
+    def _setup_ui_for_mode(self) -> None:
+        match self.mode:
+            case DialogMode.Create:
+                self._setup_create_profile_mode()
+            case DialogMode.Edit(profile_name=edit_name, profile_settings=edit_settings):
+                self._setup_edit_mode(profile_name=edit_name)
+                self.load_profile_settings(profile_name=edit_name, profile_settings=edit_settings)
+
+    def _setup_create_profile_mode(self) -> None:
+        self.setWindowTitle("Create Profile")
+
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Save
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
+
+        self.commit_buttons_box.rejected.connect(self.reject)
+        self.commit_buttons_box.accepted.connect(self._insert_profile_settings)
+
+    def _setup_edit_mode(self, profile_name: str) -> None:
+        self.setWindowTitle(f"Edit Profile: {profile_name}")
+
+        self.commit_buttons_box = aqt.qt.QDialogButtonBox(
+            aqt.qt.QDialogButtonBox.StandardButton.Save
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
+        self.save_button = self.commit_buttons_box.button(aqt.qt.QDialogButtonBox.StandardButton.Save)
+        self.save_button.setEnabled(False)
+
+        self.commit_buttons_box.rejected.connect(self.reject)
+        self.commit_buttons_box.accepted.connect(self._update_profile_settings)
+
+    def connect_widgets_change(self, slot) -> None:
+        for children in self.findChildren(aqt.qt.QWidget):
+            if isinstance(children, aqt.qt.QAbstractButton):
+                children.toggled.connect(slot)
+            elif isinstance(children, aqt.qt.QComboBox):
+                children.currentIndexChanged.connect(slot)
+            elif isinstance(children, aqt.qt.QLineEdit):
+                children.textChanged.connect(slot)
+            elif isinstance(children, aqt.qt.QPlainTextEdit):
+                children.textChanged.connect(slot)
+
+    def _on_widget_settings_changed(self) -> None:
+        is_changed = self.config != self._collect_profile_settings()
+        self.save_button.setEnabled(is_changed)
+
+    def reject(self) -> None:
+        if self.confirm_settings_changes_discard():
+            super().reject()
+
+    def confirm_settings_changes_discard(self) -> bool:
+        if self.config != self._collect_profile_settings():
+            return dialogs.confirm_unsaved_changes_discard(parent=self)
+        else:
+            return True
+
+    def _collect_profile_settings(self) -> dict[str, dict[str, Any]]:
+        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
+
+        selected_fields = [
+            field for field, checked in
+            self.profile_creation_settings.fields_selection_check_boxes.fields_status.items()
+            if checked
+        ]
+
+        generate_as_new_cards = general_tab.generate_as_new_cards_checkbox.isChecked()
+        add_tag = generate_as_new_cards and general_tab.add_tag_to_generated_cards_checkbox.isChecked()
+        profile_name = general_tab.enter_profile_name_line_edit.text().strip()
+
+        return {profile_name:
+            {
+                "selected_card_type": self.profile_creation_settings.card_types_combo_box.currentText(),
+                "selected_fields": selected_fields,
+                "selected_fields_settings": copy.deepcopy(fields_tab.fields_settings._field_data),
+                "selected_model": self.profile_creation_settings.ai_models_combo_box.currentText(),
+                "generate_as_new_cards": generate_as_new_cards,
+                "deck_for_generated_cards": general_tab.choose_deck_combo_box.currentText() if generate_as_new_cards else None,
+                "add_tag_to_generated_cards": add_tag,
+                "tag_name_for_generated_cards": general_tab.tag_name_line_edit.text().strip() if add_tag else None,
+                "prompt_text": self.prompt_text_edit.prompt_text_edit.toPlainText().strip()
+            }
+        }
+
+    def load_profile_settings(self, profile_name: str, profile_settings: dict[str, Any]) -> None:
+        self.config = copy.deepcopy({profile_name: profile_settings})
+        self.original_profile_name = profile_name
+
+        general_tab = self.profile_creation_settings.settings_tabs.general_settings_tab
+        fields_tab = self.profile_creation_settings.settings_tabs.fields_setting_tab
+
+        general_tab.enter_profile_name_line_edit.setText(profile_name)
+
+        self.profile_creation_settings.card_types_combo_box.setCurrentText(profile_settings["selected_card_type"])
+        for check_box in self.profile_creation_settings.fields_selection_check_boxes.check_boxes_list:
+            check_box.setChecked(check_box.text() in profile_settings["selected_fields"])
+
+        fields_tab.fields_settings._field_data = copy.deepcopy(profile_settings["selected_fields_settings"])
+        fields_tab.fields_settings.fields_settings_changed.emit(profile_settings["selected_fields_settings"])
+        fields_tab.fields_settings.load_field_settings(fields_tab.fields_setting_combo_box.currentText())
+
+        self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["selected_model"])
+        general_tab.generate_as_new_cards_checkbox.setChecked(profile_settings["generate_as_new_cards"])
+        general_tab.choose_deck_combo_box.setCurrentText(profile_settings["deck_for_generated_cards"])
+        general_tab.add_tag_to_generated_cards_checkbox.setChecked(profile_settings["add_tag_to_generated_cards"])
+        general_tab.tag_name_line_edit.setText(profile_settings["tag_name_for_generated_cards"])
+        self.prompt_text_edit.prompt_text_edit.setPlainText(profile_settings["prompt_text"])
+
+        # self.profile_creation_settings.ai_models_combo_box.setCurrentText(profile_settings["Not existing value in settings"])
+
+    def _insert_profile_settings(self) -> None:
+        profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
+        profile_name = next(iter(profile))
+
+        if profile_name == "":
+            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            return
+
+        if gui_utils.profile_name_is_too_long(profile):
+            dialogs.profile_name_is_too_long_warning(profile_name, parent=self.parent)
+            return
+
+        if len(profile[profile_name]["selected_fields"]) == 0:
+            dialogs.no_fields_were_selected(parent=self.parent)
+            return
+
+        if gui_utils.insert_profile_settings_in_config(profile):
+            self.accept()
+            dialogs.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
+
+    def _update_profile_settings(self) -> None:
+        edited_profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
+        edited_profile_name = next(iter(edited_profile))
+
+        if edited_profile_name == "":
+            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            return
+
+        if gui_utils.profile_name_is_too_long(edited_profile):
+            dialogs.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
+            return
+
+        if len(edited_profile[edited_profile_name]["selected_fields"]) == 0:
+            dialogs.no_fields_were_selected(parent=self.parent)
+            return
+
+        if self.original_profile_name == edited_profile_name:
+            if gui_utils.update_profile_settings_name(edited_profile, profile_name_was_edited=False):
+                self.profile_settings_changed.emit(edited_profile)
+                self.accept()  # TODO Do I need still this accept function here?
+                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+        else:
+            if gui_utils.update_profile_settings_name(
+                edited_profile,
+                profile_name_was_edited=True,
+                original_profile_name=self.original_profile_name
+            ):
+                self.profile_settings_changed.emit(edited_profile)
+                self.accept()  # TODO Do I need still this accept function here?
+                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+
+
+class PromptTextEditLayout(aqt.qt.QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        grid = aqt.qt.QGridLayout(self)
+
+        self.prompt_label = aqt.qt.QLabel("Prompt")
+        self.prompt_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        self.setStyleSheet(f"""QLabel {{font-size: {style.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
+
+        self.prompt_text_edit = aqt.qt.QPlainTextEdit()
+        self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
+        self.prompt_text_edit.setPlaceholderText("Enter your prompt here")
+        self.prompt_text_edit.setToolTip(
+            "Enter instructions in text edit to guide AI how to enhance your cards."
+        )
+
+        grid.addWidget(self.prompt_label, 0, 0)
+        grid.addWidget(self.prompt_text_edit, 1, 0)
+
+        grid.setRowStretch(1, 1)
+
+
+class ProfileCreationSettings(aqt.qt.QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self.card_types_combo_box = CardTypesComboBox()
+        self.fields_selection_check_boxes = FieldsSelectionCheckBoxes()
+        self.ai_models_combo_box = AiModelsComboBox()
+        self.ai_model_prices = AiModelPrices()
+
+        self.settings_tabs = SettingTabs()
+        # self.settings_tabs.setStyleSheet("margin-bottom: 9px")
+        # self.create_profile_button = aqt.qt.QPushButton("Create Profile")
+        # self.create_profile_button.setStyleSheet("margin-bottom: 9px") # ALign the create_profile_button with prompt text edit
+
+        self._reset_fields_settings_on_card_type_switch() # Reset needs to be before card type fields selection update, so the data is being cleared, and then we receive the seleceted fields data
+        self._update_fields_selection_check_boxes_on_card_type_switch()
+        self._update_ai_model_prices_on_ai_model_switch()
+
+        self._update_expected_io_text_edits_on_selected_fields_toggle()
+        self._update_fields_setting_combo_box_on_selected_fields_toggle()
+        self._update_fields_settings_on_selected_fields_toggle()
+
+        self._send_initial_signals()
+
+        grid = aqt.qt.QGridLayout(self)
+
+        grid.addWidget(self.card_types_combo_box, 0, 0)
+        grid.addWidget(self.fields_selection_check_boxes, 0, 1, 3, 1)
+        grid.addWidget(self.ai_models_combo_box, 1, 0)
+        grid.addLayout(self.ai_model_prices, 2, 0)
+        grid.addWidget(self.settings_tabs, 3, 0, 1, 2)
+        # self.addWidget(self.create_profile_button, 4, 0, 1, 2)
+
+    def _send_initial_signals(self) -> None:
+        self.card_types_combo_box.on_card_type_switch()
+        self.ai_models_combo_box.on_ai_model_switch()
+        self.fields_selection_check_boxes.on_check_box_toggled()
+
+
+    def _update_fields_selection_check_boxes_on_card_type_switch(self) -> None:
+        self.card_types_combo_box.card_type_switch_signal.connect(
+            self.fields_selection_check_boxes.create_field_check_boxes
+        )
+
+    def _reset_fields_settings_on_card_type_switch(self) -> None:
+        self.card_types_combo_box.card_type_switch_signal.connect(
+            self.settings_tabs.fields_setting_tab.fields_settings.clear_field_data
+        )
+
+    def _update_ai_model_prices_on_ai_model_switch(self) -> None:
+        self.ai_models_combo_box.ai_model_switch_signal.connect(
+            self.ai_model_prices.set_input_price
+        )
+
+        self.ai_models_combo_box.ai_model_switch_signal.connect(
+            self.ai_model_prices.set_output_price
+        )
+
+    def _update_expected_io_text_edits_on_selected_fields_toggle(self) -> None:
+        self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
+            self.settings_tabs.expected_input_and_output.update_text_edits
+        )
+
+    def _update_fields_setting_combo_box_on_selected_fields_toggle(self) -> None:
+        self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
+            self.settings_tabs.fields_setting_tab.fields_setting_combo_box.set_fields_to_combo_box
+        )
+
+    def _update_fields_settings_on_selected_fields_toggle(self) -> None:
+        self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
+            self.settings_tabs.fields_setting_tab.fields_settings.sync_with_selected_fields
+        )
+
+
+class CardTypesComboBox(aqt.qt.QComboBox):
+    card_type_switch_signal = aqt.qt.pyqtSignal(list)
+
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
+        super().__init__(parent)
+        self.setToolTip("Choose card type for the profile")
+
+        self.currentIndexChanged.connect(self.on_card_type_switch)
+        self.addItems(mw.col.models.all_names())
+
+    def on_card_type_switch(self) -> None:
+        card_type_str = str(self.currentText())
+
+        card_type_id = mw.col.models.by_name(card_type_str)
+        card_type_fields_list = mw.col.models.field_names(card_type_id)
+
+        self.card_type_switch_signal.emit(card_type_fields_list)
+
+
+class FieldsSelectionCheckBoxes(aqt.qt.QWidget):
+    selected_fields_toggle_signal = aqt.qt.pyqtSignal(dict)
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        grid = aqt.qt.QGridLayout(self)
+
+        self.scrollable_fields_check_boxes_widget = aqt.qt.QWidget()
+        self.fields_check_boxes_vertical_layout = aqt.qt.QVBoxLayout(self.scrollable_fields_check_boxes_widget)
+        self.check_boxes_list = []
+        self.fields_status = {}
+
+        self.scroll_area = aqt.qt.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scrollable_fields_check_boxes_widget)
+
+        self.scroll_area.setFixedHeight(180)
+
+        grid.addWidget(self.scroll_area, 0, 0)
+
+    def create_field_check_boxes(self, fields_list) -> None: # TODO ADD type hint
+        self.clear_field_check_boxes()
+
+        for field in fields_list:
+            check_box = aqt.qt.QCheckBox(str(field))
+            check_box.toggled.connect(self.on_check_box_toggled)
+            check_box.setToolTip(
+                "Choose which card fields you want to send to AI for the enhancement"
+            )
+
+            self.fields_check_boxes_vertical_layout.addWidget(check_box)
+            self.check_boxes_list.append(check_box)
+
+            check_box.setChecked(True)
+
+        self.on_check_box_toggled()
+
+    def clear_field_check_boxes(self) -> None:
+        while self.fields_check_boxes_vertical_layout.count():
+            item = self.fields_check_boxes_vertical_layout.takeAt(0)
+            widget = item.widget()
+
+            if widget:
+                widget.deleteLater()
+        self.check_boxes_list.clear()
+
+    def on_check_box_toggled(self) -> None:
+        self.fields_status = {cb.text(): cb.isChecked() for cb in self.check_boxes_list}
+        self.selected_fields_toggle_signal.emit(self.fields_status)
+
+
+class AiModelsComboBox(aqt.qt.QComboBox):
+    ai_model_switch_signal = aqt.qt.pyqtSignal(str)
+
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
+        super().__init__(parent)
+        self.setToolTip(
+            "Select which AI model will be used for notes enhancement"
+        )
+
+        self.add_models()
+        self.currentIndexChanged.connect(self.on_ai_model_switch)
+
+    def add_models(self):
+        for model in AVAILABLE_MODELS:
+            company = gui_utils.model_to_company_name(model)
+            icon = gui_utils.get_company_icon(company)
+            self.addItem(icon, model)
+
+    def on_ai_model_switch(self) -> None:
+        model_name = str(self.currentText())
+        self.ai_model_switch_signal.emit(model_name)
+
+
+class AiModelPrices(aqt.qt.QGridLayout):
+    def __init__(self, parent: aqt.qt.QWidget | None=None) -> None:
+        super().__init__(parent)
+
+        self.input_price_label = aqt.qt.QLabel("Input price:")
+        self.input_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        self.output_price_label = aqt.qt.QLabel("Output price:")
+        self.output_price_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        self.input_price_line = aqt.qt.QLineEdit()
+        self.input_price_line.setReadOnly(True)
+        self.input_price_line.setToolTip(
+            "Input price for 1 million tokens\n"
+            "In English, 1 token is roughly 4 characters.\n"
+            "Other languages/scripts may consume more tokens per word."
+        )
+
+        self.output_price_line = aqt.qt.QLineEdit()
+        self.output_price_line.setReadOnly(True)
+        self.output_price_line.setToolTip(
+            "Output price for 1 million tokens\n"
+            "In English, 1 token is roughly 4 characters.\n"
+            "Other languages/scripts may consume more tokens per word."
+        )
+
+        self.addWidget(self.input_price_label, 0, 0)
+        self.addWidget(self.output_price_label, 0, 1)
+        self.addWidget(self.input_price_line, 1, 0)
+        self.addWidget(self.output_price_line, 1, 1)
+
+    def set_input_price(self, model_name: str) -> None:
+        input_price = MODELS_INPUT_PRICES[model_name]
+        self.input_price_line.setText(gui_utils.decide_price_format(input_price) + "$")
+
+    def set_output_price(self, model_name: str) -> None:
+        output_price = MODELS_OUTPUT_PRICES[model_name]
+        self.output_price_line.setText(gui_utils.decide_price_format(output_price) + "$")
+
+
+class SettingTabs(aqt.qt.QTabWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self.setting_widget = aqt.qt.QWidget()
+        self.setting_layout = aqt.qt.QVBoxLayout(self.setting_widget)
+
+        self.expected_input_and_output = ExpectedInputAndOutput()
+        self.fields_setting_tab = FieldsSettingsTab()
+        self.general_settings_tab = GeneralSettingsTab()
+
+        self.addTab(self.fields_setting_tab, "Fields settings")
+        self.addTab(self.expected_input_and_output, "Expected Input and Output")
+        self.addTab(self.general_settings_tab, "General settings")
+
+
+class ExpectedInputAndOutput(aqt.qt.QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        field_layout = aqt.qt.QGridLayout(self)
+
+        expected_input_label = aqt.qt.QLabel("Expected input for AI is:")
+        expected_input_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        expected_output_label = aqt.qt.QLabel("Expected output from AI is:")
+        expected_output_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
+
+        self.font = aqt.qt.QFont()
+        self.font.setPointSize(12)
+
+        self.expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
+        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")
+        self.expected_fields_input_to_ai_text_edit.setReadOnly(True)
+
+        self.expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
+        self.expected_output_from_ai_text_edit.setToolTip("This is how the output from AI should look like")
+        self.expected_output_from_ai_text_edit.setReadOnly(True)
+
+        self.expected_fields_input_to_ai_text_edit.setFont(self.font)
+        self.expected_output_from_ai_text_edit.setFont(self.font)
+
+        self.expected_fields_input_to_ai_text_edit.setLineWrapMode(
+            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
+        )
+        self.expected_fields_input_to_ai_text_edit.setHorizontalScrollBarPolicy(
+            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        self.expected_output_from_ai_text_edit.setLineWrapMode(
+            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
+        )
+        self.expected_output_from_ai_text_edit.setHorizontalScrollBarPolicy(
+            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        field_layout.addWidget(expected_input_label, 0, 0)
+        field_layout.addWidget(expected_output_label, 0, 1)
+        field_layout.addWidget(self.expected_fields_input_to_ai_text_edit, 1, 0)
+        field_layout.addWidget(self.expected_output_from_ai_text_edit, 1, 1)
+
+    def update_text_edits(self, fields_status: dict[str, bool]) -> None:
+        selected_fields = [field for field, value in fields_status.items() if value]
+        input_text = "".join(f"{field}|{{Field Data}}\n" for field in selected_fields)
+        output_text = "".join(f"{field}|{{Generated Data}}\n" for field in selected_fields)
+
+        self.expected_fields_input_to_ai_text_edit.setPlainText(input_text)
+        self.expected_output_from_ai_text_edit.setPlainText(output_text)
+
+
+class FieldsSettingsTab(aqt.qt.QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        grid = aqt.qt.QGridLayout(self)
+
+        self.fields_setting_combo_box = FieldsSettingsComboBox()
+        self.fields_settings = FieldsSettings()
+        self.fields_settings_table = FieldsSettingsTable()
+
+        self.fields_setting_combo_box.currentTextChanged.connect(
+            self._load_setting_for_selected_field_in_combo_box
+        )
+
+        self.fields_settings.fields_settings_changed.connect(
+            self.fields_settings_table.load_fields_setting_data
+        )
+
+        self.fields_setting_combo_box.setStyleSheet("margin: 15px;")
+
+        grid.addWidget(self.fields_setting_combo_box, 0, 0, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignLeft)
+        grid.addWidget(self.fields_settings, 0, 1, 1, 1, aqt.qt.Qt.AlignmentFlag.AlignTop | aqt.qt.Qt.AlignmentFlag.AlignRight)
+        grid.addWidget(self.fields_settings_table, 1, 0, 1, 2)
+
+        self.fields_setting_combo_box.setFixedWidth(200)
+
+    def _load_setting_for_selected_field_in_combo_box(self, new_selected_field: str):
+        if new_selected_field:
+            self.fields_settings.load_field_settings(new_selected_field)
+
+
+class FieldsSettingsComboBox(aqt.qt.QComboBox):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setToolTip("Select field to configure cleanup settings for")
+
+    def set_fields_to_combo_box(self, fields_status: dict[str, bool]) -> None:
+        previous_selection = self.currentText()
+        self.clear()
+
+        selected_fields = [field for field, value in fields_status.items() if value]
+        self.addItems(selected_fields)
+
+        if previous_selection in selected_fields:
+            self.setCurrentText(previous_selection)
+
+
+class FieldsSettings(aqt.qt.QWidget):
+    fields_settings_changed = aqt.qt.pyqtSignal(dict)
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        v_layout = aqt.qt.QVBoxLayout(self)
+
+        self._field_data: dict[str, dict[str, bool]] = {}
+        self._current_field = ""
+
+        self.fields_setting_label = aqt.qt.QLabel("All Fields Settings:")
+        self.strip_html_check_box = aqt.qt.QCheckBox("Strip HTML tags in fields")
+        self.strip_brackets_check_box = aqt.qt.QCheckBox("Strip square brackets in fields")
+        self.convert_cloze_check_box = aqt.qt.QCheckBox("Convert cloze to plain text")
+        self.strip_non_ascii_check_box = aqt.qt.QCheckBox("Strip Non-ASCII characters in fields")
+
+        self.strip_html_check_box.setToolTip(
+            "Remove HTML formatting tags (such as &lt;b&gt;, &lt;i&gt;, &lt;br&gt;, or &lt;font&gt;) to send clean plain text to the AI and save tokens."
+        )
+        self.strip_brackets_check_box.setToolTip(
+            "Remove square brackets and their contents (e.g., [...]) "
+            "to prevent cluttering or sending Anki media tags (like [sound:...]) to the AI."
+        )
+        self.convert_cloze_check_box.setToolTip(
+            "Convert cloze to plain text (e.g. Converts {{c1 :: Paris}} to Paris)"
+        )
+        self.strip_non_ascii_check_box.setToolTip(
+            "Remove non-standard characters, emojis, and special symbols, keeping only basic Latin letters, numbers, and punctuation."
+        )
+
+        self.strip_html_check_box.toggled.connect(self._update_fields_data)
+        self.strip_brackets_check_box.toggled.connect(self._update_fields_data)
+        self.convert_cloze_check_box.toggled.connect(self._update_fields_data)
+        self.strip_non_ascii_check_box.toggled.connect(self._update_fields_data)
+
+        v_layout.addWidget(self.fields_setting_label)
+        v_layout.addWidget(self.strip_html_check_box)
+        v_layout.addWidget(self.strip_brackets_check_box)
+        v_layout.addWidget(self.convert_cloze_check_box)
+        v_layout.addWidget(self.strip_non_ascii_check_box)
+
+        v_layout.setSpacing(12)
+
+    def _update_fields_data(self) -> None:
+        if not self._current_field:
+            return
+
+        self._field_data[self._current_field] = {
+            "strip_html" : self.strip_html_check_box.isChecked(),
+            "strip_brackets" : self.strip_brackets_check_box.isChecked(),
+            "convert_cloze" : self.convert_cloze_check_box.isChecked(),
+            "strip_non_ascii" : self.strip_non_ascii_check_box.isChecked()
+        }
+
+        self.fields_settings_changed.emit(self._field_data)
+
+    def sync_with_selected_fields(self, fields_status: dict[str, bool]) -> None:
+        new_fields_data = {}  # New dict is created, so items are sorted in the same way as in fields_status
+
+        for field, checked in fields_status.items():
+            if not checked:
+                continue
+
+            if field in self._field_data:
+                new_fields_data[field] = self._field_data[field]
+            else:
+                new_fields_data[field] = {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                }
+
+        self._field_data = new_fields_data
+        self.fields_settings_changed.emit(self._field_data)
+
+    def clear_field_data(self) -> None:
+        self._field_data.clear()
+
+        self._block_signals_to_check_boxes(True)
+
+        self.strip_html_check_box.setChecked(False)
+        self.strip_brackets_check_box.setChecked(False)
+        self.convert_cloze_check_box.setChecked(False)
+        self.strip_non_ascii_check_box.setChecked(False)
+
+        self._block_signals_to_check_boxes(False)
+
+        self.fields_settings_changed.emit(self._field_data)
+
+    def _block_signals_to_check_boxes(self, state: bool) -> None:
+        self.strip_html_check_box.blockSignals(state)
+        self.strip_brackets_check_box.blockSignals(state)
+        self.convert_cloze_check_box.blockSignals(state)
+        self.strip_non_ascii_check_box.blockSignals(state)
+
+    def load_field_settings(self, new_selected_field: str) -> None:
+        if new_selected_field in self._field_data.keys():
+            self._current_field = new_selected_field
+            self.fields_setting_label.setText(f"{self._current_field} Field Settings:")
+
+            settings = self._field_data[self._current_field]
+
+            self._block_signals_to_check_boxes(True)
+
+            self.strip_html_check_box.setChecked(settings.get("strip_html", False))
+            self.strip_brackets_check_box.setChecked(settings.get("strip_brackets", False))
+            self.convert_cloze_check_box.setChecked(settings.get("convert_cloze", False))
+            self.strip_non_ascii_check_box.setChecked(settings.get("strip_non_ascii", False))
+
+            self._block_signals_to_check_boxes(False)
+
+
+class FieldsSettingsTable(aqt.qt.QTableWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        self.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
+
+        self.setColumnCount(5)
+        self.setHorizontalHeaderLabels(['Field Name', 'Strip HTML', 'Strip Brackets', 'Convert Cloze', 'Strip Non-ASCII'])
+
+        self.horizontalHeader().setSectionResizeMode(
+            aqt.qt.QHeaderView.ResizeMode.Stretch
+        )
+
+        self.verticalHeader().hide()
+
+    def load_fields_setting_data(self, fields_setting_data: dict[str, dict[str, bool]]) -> None:
+        selected_fields = [field for field in fields_setting_data.keys()]
+        selected_fields_length = len(selected_fields)
+        self.setRowCount(selected_fields_length)
+
+        for row_index in range(selected_fields_length):
+            field_name = selected_fields[row_index]
+            self.setItem(row_index, 0, aqt.qt.QTableWidgetItem(field_name))
+
+            field_settings = fields_setting_data[field_name]
+
+            for col_index, strip_setting in enumerate(("strip_html", "strip_brackets", "convert_cloze", "strip_non_ascii"), start=1):
+                self.setItem(
+                    row_index,
+                    col_index,
+                    gui_utils.create_table_check_item(checked=field_settings.get(strip_setting, False))
+                )
+
+
+class GeneralSettingsTab(aqt.qt.QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+
+        main_layout = aqt.qt.QHBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(50)
+
+        left_layout = aqt.qt.QVBoxLayout()
+        left_layout.setSpacing(0)
+
+        self.generate_as_new_cards_checkbox = aqt.qt.QCheckBox("Create new notes from generated data")
+
+        self.choose_deck_label = aqt.qt.QLabel("Save generated notes to deck:")
+        self.choose_deck_combo_box = aqt.qt.QComboBox()
+        self.choose_deck_combo_box.setFixedWidth(235)
+
+        self.add_tag_to_generated_cards_checkbox = aqt.qt.QCheckBox("Add tag to generated notes")
+        self.enter_tag_name_label = aqt.qt.QLabel("Enter tag name:")
+        self.tag_name_line_edit = aqt.qt.QLineEdit()
+        self.tag_name_line_edit.setFixedWidth(235)
+
+        left_layout.addWidget(self.generate_as_new_cards_checkbox)
+        left_layout.addSpacing(15)
+        left_layout.addWidget(self.choose_deck_label)
+        left_layout.addSpacing(6)
+        left_layout.addWidget(self.choose_deck_combo_box)
+        left_layout.addSpacing(18)
+        left_layout.addWidget(self.add_tag_to_generated_cards_checkbox)
+        left_layout.addSpacing(15)
+        left_layout.addWidget(self.enter_tag_name_label)
+        left_layout.addSpacing(6)
+        left_layout.addWidget(self.tag_name_line_edit)
+        left_layout.addStretch(1)
+
+        right_layout = aqt.qt.QVBoxLayout()
+        right_layout.setSpacing(8)
+
+        self.enter_profile_name_label = aqt.qt.QLabel("Profile name:")
+        self.enter_profile_name_line_edit = aqt.qt.QLineEdit()
+        self.enter_profile_name_line_edit.setFixedWidth(220)
+
+        right_layout.addWidget(self.enter_profile_name_label)
+        right_layout.addWidget(self.enter_profile_name_line_edit)
+        right_layout.addStretch(1)
+
+        main_layout.addLayout(left_layout)
+        main_layout.addLayout(right_layout)
+        main_layout.addStretch(1)
+
+        self._add_deck_names_to_the_combo_box()
+        self._create_opacity_effects()
+
+        self.generate_as_new_cards_checkbox.toggled.connect(self._switch_other_widgets_opacity)
+        self.add_tag_to_generated_cards_checkbox.toggled.connect(self._switch_add_tag_widget_opacity)
+
+        self._switch_other_widgets_opacity(self.generate_as_new_cards_checkbox.isChecked())
+        self._switch_add_tag_widget_opacity(self.add_tag_to_generated_cards_checkbox.isChecked())
+
+    def _create_opacity_effects(self) -> None:
+        self.widgets_with_opacity_effect = [
+            self.choose_deck_label,
+            self.choose_deck_combo_box,
+            self.add_tag_to_generated_cards_checkbox,
+            self.enter_tag_name_label,
+            self.tag_name_line_edit,
+        ]
+
+        self.opacity_effects_list = []
+        for index, widget in enumerate(self.widgets_with_opacity_effect):
+            effect = aqt.qt.QGraphicsOpacityEffect(widget)
+            self.opacity_effects_list.append(effect)
+            widget.setGraphicsEffect(effect)
+
+    def _switch_other_widgets_opacity(self, checked: bool) -> None:
+        widget_and_opacity_effect_tuple = zip(
+            self.widgets_with_opacity_effect[0:3], self.opacity_effects_list[0:3]
+        )
+        opacity = 1.0 if checked else 0.5
+
+        for widget, opacity_effect in widget_and_opacity_effect_tuple:
+            widget.setEnabled(checked)
+            opacity_effect.setOpacity(opacity)
+
+            if not checked and isinstance(widget, aqt.qt.QCheckBox):
+                widget.setChecked(False)
+
+    def _switch_add_tag_widget_opacity(self, checked: bool) -> None:
+        widget_and_opacity_effect_tuple = zip(
+            self.widgets_with_opacity_effect[3:], self.opacity_effects_list[3:]
+        )
+        opacity = 1.0 if checked else 0.5
+
+        for widget, opacity_effect in widget_and_opacity_effect_tuple:
+            widget.setEnabled(checked)
+            opacity_effect.setOpacity(opacity)
+
+            if not checked and isinstance(widget, aqt.qt.QLineEdit):
+                widget.clear()
+
+    def _add_deck_names_to_the_combo_box(self) -> None:
+        deck_names: list[str] = mw.col.decks.all_names()
+        self.choose_deck_combo_box.addItems(deck_names)
