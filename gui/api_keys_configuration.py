@@ -3,6 +3,7 @@ from aqt import mw
 
 from . import gui_utils
 from ..utils.constants import EYE_ICON_PATH, EYE_OFF_ICON_PATH, OPENAI_ICON_PATH, CONFIG, AVAILABLE_COMPANIES, ADDON_PACKAGE
+from . import dialogs
 
 class ApiKeysConfigurationDialog(aqt.qt.QDialog):
     def __init__(self, parent=None):
@@ -82,11 +83,7 @@ class ApiKeysConfigurationDialog(aqt.qt.QDialog):
 
     def confirm_line_edits_changes_discard(self) -> bool:
         if self.companies_api_keys != self._collect_current_api_keys():
-            return aqt.utils.askUser(
-                "You have unsaved changes. Discard them and close?",
-                parent=self,
-                title="Unsaved Changes"
-            )
+            return dialogs.confirm_unsaved_changes_discard(parent=self)
         else:
             return True
 

@@ -1,9 +1,8 @@
-import aqt
-from aqt.qt import QDialog
 from aqt.browser import Browser
-from aqt.utils import showInfo, showWarning, showCritical
+from aqt.utils import showInfo, showWarning, showCritical, askUser
 
 from . import style
+from ..utils import constants
 
 
 def show_successful_notes_creation(creation_deck: str, amount_of_notes: int, parent: Browser) -> None:
@@ -60,8 +59,48 @@ def profile_was_successfully_created(profile_name: str, parent) -> None:
 def profile_was_successfully_edited(profile_name: str, parent) -> None:
     showInfo(f'Profile "{profile_name}" was successfully edited', parent=parent)
 
+def confirm_unsaved_changes_discard(parent) -> bool:
+    return askUser(
+        "You have unsaved changes. Discard them and close?",
+        parent=parent,
+        title="Unsaved Changes"
+    )
+
+def confirm_profile_deletion(profile_name: str, parent) -> bool:
+    return askUser(
+            text=f'Are you sure you want to delete profile "{profile_name}"?',
+            parent=parent,
+            title="Confirm Deletion"
+    )
+
+def profile_was_successfully_deleted(profile_name: str, parent) -> None:
+    showInfo(f"Profile {profile_name} was successfully deleted", parent=parent)
+
+def too_many_notes_were_selected_warning(parent):
+    showWarning(
+        f"You have selected more than {constants.MAX_NOTES_TO_APPLY} notes.\n"
+        f"Please select no more than {constants.MAX_NOTES_TO_APPLY} notes to apply a profile.",
+        parent=parent
+    )
+
+def profile_with_such_name_already_exists(profile_name: str, parent=None) -> None:
+    showInfo(
+        f'Profile with name "{profile_name}" already exist. Please try a different name.',
+        parent=parent
+    )
+
+def config_not_found_error(parent=None) -> None:
+    showCritical("Config not found", parent=parent)
+
 def more_than_one_note_type_selected_warning() -> None:
     showWarning("More than 1 note type selected")
+
+def no_fields_were_selected(parent=None) -> None:
+    showInfo(
+        "You didn't select any card field.\n"
+        "Please, select at least 1 card field.",
+        parent=parent
+    )
 
 
 def no_cards_were_selected_warning() -> None:

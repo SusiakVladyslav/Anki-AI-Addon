@@ -30,7 +30,6 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.parent = parent
         self.mode = mode
         self.original_profile_name: str | None = None
-        self.config: dict | None = None
 
         self.resize(1200, 800)
         self.setModal(False)
@@ -40,6 +39,8 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         self.profile_creation_settings = ProfileCreationSettings()
         self.commit_buttons_box = aqt.qt.QDialogButtonBox()
 
+        self.config = self._collect_profile_settings()
+
         self._setup_ui_for_mode()
 
         grid = aqt.qt.QGridLayout(self)
@@ -47,7 +48,8 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         grid.addWidget(self.profile_creation_settings, 0, 1)
         grid.addWidget(self.commit_buttons_box, 1, 1)
 
-        self.connect_widgets_change(self._on_widget_settings_changed)
+        if isinstance(self.mode, DialogMode.Edit):
+            self.connect_widgets_change(self._on_widget_settings_changed)
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
@@ -96,9 +98,6 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
                 children.textChanged.connect(slot)
 
     def _on_widget_settings_changed(self) -> None:
-        if self.config is None:
-            return
-
         is_changed = self.config != self._collect_profile_settings()
         self.save_button.setEnabled(is_changed)
 
@@ -108,11 +107,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
     def confirm_settings_changes_discard(self) -> bool:
         if self.config != self._collect_profile_settings():
-            return aqt.utils.askUser(
-                "You have unsaved changes. Discard them and close?",
-                parent=self,
-                title="Unsaved Changes"
-            )
+            return dialogs.confirm_unsaved_changes_discard(parent=self)
         else:
             return True
 
@@ -182,6 +177,10 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             dialogs.profile_name_is_too_long_warning(profile_name, parent=self.parent)
             return
 
+        if len(profile[profile_name]["selected_fields"]) == 0:
+            dialogs.no_fields_were_selected(parent=self.parent)
+            return
+
         if gui_utils.insert_profile_settings_in_config(profile):
             self.accept()
             dialogs.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
@@ -196,6 +195,10 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
         if gui_utils.profile_name_is_too_long(edited_profile):
             dialogs.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
+            return
+
+        if len(edited_profile[edited_profile_name]["selected_fields"]) == 0:
+            dialogs.no_fields_were_selected(parent=self.parent)
             return
 
         if self.original_profile_name == edited_profile_name:

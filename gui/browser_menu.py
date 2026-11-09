@@ -5,8 +5,9 @@ import aqt
 from .browser_gui import generate_sentences_for_selected_notes_action
 from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
 from .apply_profile_window import ApplyProfileDialog
-from .. utils.constants import CONFIG
+from .. utils.constants import CONFIG, MAX_NOTES_TO_APPLY
 from . import style, gui_utils
+from . import dialogs
 
 
 def setup_browser_menus(browser: Browser) -> None:
@@ -45,9 +46,11 @@ def setup_scrollable_profile_buttons(generation_profiles_menu: QMenu, profile_na
     scroll_area.setHorizontalScrollBarPolicy(aqt.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     scroll_area.setVerticalScrollBarPolicy(aqt.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
-    scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+    scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")  # Removes border in the menu
 
     container_widget = aqt.qt.QWidget()
+    container_widget.setStyleSheet("background: transparent;")  # Makes scrollable area have the same color as the menu
+
     layout = aqt.qt.QVBoxLayout(container_widget)
     layout.setContentsMargins(0,0,0,0)
     layout.setSpacing(0)
@@ -107,9 +110,14 @@ def setup_standard_profile_buttons(generation_profiles_menu: QMenu, profile_name
         generation_profiles_menu.addAction(profile_action)
 
 def open_apply_profile_dialog(browser: Browser, profile_name: str, generation_profiles_menu) -> None:
-    apply_profile_dialog = ApplyProfileDialog(browser, profile_name)
-    apply_profile_dialog.finished.connect(lambda: populate_ai_generation_profiles_menu(generation_profiles_menu, browser))
-    apply_profile_dialog.show()
+    selected_notes = gui_utils.get_selected_notes(browser)
+
+    if len(selected_notes) < MAX_NOTES_TO_APPLY:
+        apply_profile_dialog = ApplyProfileDialog(browser, profile_name, selected_notes)
+        apply_profile_dialog.finished.connect(lambda: populate_ai_generation_profiles_menu(generation_profiles_menu, browser))
+        apply_profile_dialog.open()
+    else:
+        dialogs.too_many_notes_were_selected_warning(parent=browser)
 
 def open_configuration_dialog(browser: Browser, generation_profiles_menu: QMenu) -> None:
     configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.Create, parent=browser)

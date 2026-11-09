@@ -2,6 +2,7 @@ import aqt.theme
 import aqt.qt
 from aqt.browser import Browser
 from aqt import mw
+from anki.notes import Note
 
 from typing import Any
 
@@ -13,7 +14,7 @@ from . import dialogs
 
 
 class ApplyProfileDialog(aqt.qt.QDialog):
-    def __init__(self, parent:Browser, profile_name:str):
+    def __init__(self, parent:Browser, profile_name: str, selected_notes: list[Note]):
         super().__init__(parent)
 
         self.setWindowTitle("Apply Profile")
@@ -65,20 +66,16 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.edit_configuration_dialog.open()
 
     def delete_profile(self):
-        deletion_confirmed: bool = aqt.utils.askUser(
-            f'Are you sure you want to delete profile "{self.profile_name}"?',
-            parent=self.parent,
-            title="Confirm Deletion"
-        )
+        deletion_confirmed: bool = dialogs.confirm_profile_deletion(profile_name=self.profile_name, parent=self.parent)
 
         if deletion_confirmed:
             gui_utils.delete_profile_from_config(self.profile_name)
-            aqt.utils.showInfo(f"Profile {self.profile_name} was successfully deleted")
+            dialogs.profile_was_successfully_deleted(self.profile_name, parent=self.parent)
             self.accept()
 
     def duplicate_profile(self):
         dialog = DuplicateProfileDialog(self.profile_name, self)
-        dialog.show()
+        dialog.open()
 
 
     def load_edited_settings(self, new_profile_settings):
@@ -334,10 +331,7 @@ class NotesDataTable(aqt.qt.QWidget):
                 self._highlight_row_as_invalid(row)
 
     def _highlight_row_as_invalid(self, row: int) -> None:
-        if aqt.theme.theme_manager.night_mode:
-            red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR_DARK)
-        else:
-            red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR_LIGHT)
+        red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR)
 
         for col in range(self.table.columnCount()):
             item = self.table.item(row, col)

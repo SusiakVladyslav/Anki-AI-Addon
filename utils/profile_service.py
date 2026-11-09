@@ -1,4 +1,4 @@
-import aqt.utils
+import aqt
 from aqt import mw
 from aqt.operations import QueryOp
 from anki.notes import Note
