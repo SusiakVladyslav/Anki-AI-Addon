@@ -2,7 +2,6 @@ from aqt.qt import QMenu, QAction, qconnect
 from aqt.browser import Browser
 import aqt
 
-from .browser_gui import generate_sentences_for_selected_notes_action
 from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
 from .apply_profile_window import ApplyProfileDialog
 from .. utils.constants import CONFIG, MAX_NOTES_TO_APPLY
@@ -10,15 +9,11 @@ from . import style, gui_utils
 from . import dialogs
 
 
-def setup_browser_menus(browser: Browser) -> None:
+def setup_browser_menu(browser: Browser) -> None:
     generation_profiles_menu = QMenu("AI Generation Profiles", browser)
     populate_ai_generation_profiles_menu(generation_profiles_menu, browser)
 
-    my_menu = QMenu("My add-on", browser)
-    populate_my_addon_menu(browser, my_menu)
-
     browser.form.menubar.addMenu(generation_profiles_menu)
-    browser.form.menubar.addMenu(my_menu)
 
 
 def populate_ai_generation_profiles_menu(generation_profiles_menu: QMenu, browser: Browser) -> None:
@@ -124,7 +119,3 @@ def open_configuration_dialog(browser: Browser, generation_profiles_menu: QMenu)
     configuration_dialog.accepted.connect(lambda: populate_ai_generation_profiles_menu(generation_profiles_menu, browser))
     configuration_dialog.open()
 
-def populate_my_addon_menu(browser: Browser, my_menu: QMenu) -> None:
-    action = QAction("Generate sentences for selected Korean Notes", browser)
-    qconnect(action.triggered, lambda: generate_sentences_for_selected_notes_action(browser))
-    my_menu.addAction(action)

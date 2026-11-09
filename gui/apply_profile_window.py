@@ -204,6 +204,8 @@ class NotesDataTable(aqt.qt.QWidget):
         grid.addWidget(self.table, 0, 0)
 
     def _configure_table_view(self):
+        self.table.setEditTriggers(aqt.qt.QAbstractItemView.EditTrigger.NoEditTriggers)
+
         self.table.setVerticalScrollMode(aqt.qt.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.setHorizontalScrollMode(aqt.qt.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.verticalScrollBar().setSingleStep(20)
