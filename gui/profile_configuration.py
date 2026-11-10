@@ -5,10 +5,10 @@ from typing import Any
 import copy
 from dataclasses import dataclass
 
-from . import gui_utils
+from ..utils import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
-from . import style
-from . import dialogs
+from . import ui_constants
+from . import notifications
 
 class DialogMode:
     @dataclass
@@ -107,7 +107,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
     def confirm_settings_changes_discard(self) -> bool:
         if self.config != self._collect_profile_settings():
-            return dialogs.confirm_unsaved_changes_discard(parent=self)
+            return notifications.confirm_unsaved_changes_discard(parent=self)
         else:
             return True
 
@@ -170,42 +170,42 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         profile_name = next(iter(profile))
 
         if profile_name == "":
-            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            notifications.profile_name_cant_be_empty_warning(parent=self.parent)
             return
 
         if gui_utils.profile_name_is_too_long(profile):
-            dialogs.profile_name_is_too_long_warning(profile_name, parent=self.parent)
+            notifications.profile_name_is_too_long_warning(profile_name, parent=self.parent)
             return
 
         if len(profile[profile_name]["selected_fields"]) == 0:
-            dialogs.no_fields_were_selected(parent=self.parent)
+            notifications.no_fields_were_selected(parent=self.parent)
             return
 
         if gui_utils.insert_profile_settings_in_config(profile):
             self.accept()
-            dialogs.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
+            notifications.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
 
     def _update_profile_settings(self) -> None:
         edited_profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
         edited_profile_name = next(iter(edited_profile))
 
         if edited_profile_name == "":
-            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            notifications.profile_name_cant_be_empty_warning(parent=self.parent)
             return
 
         if gui_utils.profile_name_is_too_long(edited_profile):
-            dialogs.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
+            notifications.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
             return
 
         if len(edited_profile[edited_profile_name]["selected_fields"]) == 0:
-            dialogs.no_fields_were_selected(parent=self.parent)
+            notifications.no_fields_were_selected(parent=self.parent)
             return
 
         if self.original_profile_name == edited_profile_name:
             if gui_utils.update_profile_settings_name(edited_profile, profile_name_was_edited=False):
                 self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+                notifications.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
         else:
             if gui_utils.update_profile_settings_name(
                 edited_profile,
@@ -214,7 +214,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             ):
                 self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+                notifications.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
 
 
 class PromptTextEditLayout(aqt.qt.QWidget):
@@ -226,7 +226,7 @@ class PromptTextEditLayout(aqt.qt.QWidget):
         self.prompt_label = aqt.qt.QLabel("Prompt")
         self.prompt_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
-        self.setStyleSheet(f"""QLabel {{font-size: {style.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
+        self.setStyleSheet(f"""QLabel {{font-size: {ui_constants.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
 
         self.prompt_text_edit = aqt.qt.QPlainTextEdit()
         self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)

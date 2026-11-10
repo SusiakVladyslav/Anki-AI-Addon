@@ -6,12 +6,11 @@ from anki.notes import Note
 
 from typing import Any
 
-from . import gui_utils
-from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
-from ..utils.profile_service import ProfileService
-from . import style
-from . import dialogs
-
+from ..utils import gui_utils
+from .profile_configuration import ProfileConfigurationDialog, DialogMode
+from ..services.profile_service import ProfileService
+from . import ui_constants
+from . import notifications
 
 class ApplyProfileDialog(aqt.qt.QDialog):
     def __init__(self, parent:Browser, profile_name: str, selected_notes: list[Note]):
@@ -25,7 +24,7 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.parent = parent
 
         self.profile_name = profile_name
-        self.selected_notes = gui_utils.get_selected_notes(self.parent)
+        self.selected_notes = selected_notes
         self.profile_settings: dict[str, Any] = gui_utils.get_profile_settings_from_config(self.profile_name)
 
         self.profile_edit_buttons = ProfileEditButtons(self.profile_name)
@@ -66,11 +65,11 @@ class ApplyProfileDialog(aqt.qt.QDialog):
         self.edit_configuration_dialog.open()
 
     def delete_profile(self):
-        deletion_confirmed: bool = dialogs.confirm_profile_deletion(profile_name=self.profile_name, parent=self.parent)
+        deletion_confirmed: bool = notifications.confirm_profile_deletion(profile_name=self.profile_name, parent=self.parent)
 
         if deletion_confirmed:
             gui_utils.delete_profile_from_config(self.profile_name)
-            dialogs.profile_was_successfully_deleted(self.profile_name, parent=self.parent)
+            notifications.profile_was_successfully_deleted(self.profile_name, parent=self.parent)
             self.accept()
 
     def duplicate_profile(self):
@@ -110,7 +109,7 @@ class DuplicateProfileDialog(aqt.qt.QDialog):
         v_layout.addStretch(1)
 
         self.label = aqt.qt.QLabel(
-            f"Enter a name for the duplicated profile (max {style.PROFILE_NAME_MAX_LENGTH} characters):"
+            f"Enter a name for the duplicated profile (max {ui_constants.PROFILE_NAME_MAX_LENGTH} characters):"
         )
         v_layout.addWidget(self.label)
 
@@ -132,11 +131,11 @@ class DuplicateProfileDialog(aqt.qt.QDialog):
         duplicate_profile_name = self.line_edit.text()
 
         if duplicate_profile_name == "":
-            dialogs.profile_name_cant_be_empty_warning(parent=self)
+            notifications.profile_name_cant_be_empty_warning(parent=self)
             return
 
-        if len(duplicate_profile_name) > style.PROFILE_NAME_MAX_LENGTH:
-            dialogs.profile_name_is_too_long_warning(duplicate_profile_name, parent=self)
+        if len(duplicate_profile_name) > ui_constants.PROFILE_NAME_MAX_LENGTH:
+            notifications.profile_name_is_too_long_warning(duplicate_profile_name, parent=self)
             return
 
         original_profile_settings = gui_utils.get_profile_settings_from_config(self.original_profile_name)
@@ -144,7 +143,7 @@ class DuplicateProfileDialog(aqt.qt.QDialog):
 
         if gui_utils.insert_profile_settings_in_config(duplicate_settings):
             super().accept()
-            dialogs.profile_was_successfully_created(duplicate_profile_name, parent=self)
+            notifications.profile_was_successfully_created(duplicate_profile_name, parent=self)
 
 class ProfileEditButtons(aqt.qt.QWidget):
     edit_requested = aqt.qt.pyqtSignal()
@@ -156,10 +155,10 @@ class ProfileEditButtons(aqt.qt.QWidget):
 
         self.setStyleSheet(f"""
             QLabel {{
-                font-size: {style.APPLY_PROFILE_LABEL_FONT_SIZE}pt;
+                font-size: {ui_constants.APPLY_PROFILE_LABEL_FONT_SIZE}pt;
             }}
             QPushButton {{
-                font-size: {style.APPLY_PROFILE_BUTTONS_FONT_SIZE}pt;
+                font-size: {ui_constants.APPLY_PROFILE_BUTTONS_FONT_SIZE}pt;
             }}
         """)
 
@@ -215,15 +214,15 @@ class NotesDataTable(aqt.qt.QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                gridline-color:  {style.GRAY_GRIDLINE_COLOR};
-                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+                gridline-color:  {ui_constants.GRAY_GRIDLINE_COLOR};
+                font-size: {ui_constants.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QTableWidget::item {{
-                padding: {style.TABLE_ITEM_PADDING}px;
-                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+                padding: {ui_constants.TABLE_ITEM_PADDING}px;
+                font-size: {ui_constants.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QHeaderView::section {{
-                font-size: {style.QTABLEWIDGET_HEADER_FONT_SIZE}pt;
+                font-size: {ui_constants.QTABLEWIDGET_HEADER_FONT_SIZE}pt;
             }}
         """)
 
@@ -236,16 +235,16 @@ class NotesDataTable(aqt.qt.QWidget):
         self.header.setSectionResizeMode(1, aqt.qt.QHeaderView.ResizeMode.ResizeToContents)
 
         for col in range(2, self.table.columnCount()):
-            self.table.setColumnWidth(col, style.TABLE_COLUMN_WIDTH)
+            self.table.setColumnWidth(col, ui_constants.TABLE_COLUMN_WIDTH)
 
         for row in range(self.table.rowCount()):
             font = self.table.font()
-            font.setPointSize(style.QTABLEWIDGET_FONT_SIZE)
+            font.setPointSize(ui_constants.QTABLEWIDGET_FONT_SIZE)
             font_metrics = aqt.qt.QFontMetrics(font)
 
             required_height_for_row = self.calculate_row_height(row, font_metrics)
             self.table.setRowHeight(
-                row, min(required_height_for_row, style.TABLE_MAX_ROW_HEIGHT)
+                row, min(required_height_for_row, ui_constants.TABLE_MAX_ROW_HEIGHT)
             )
 
         self.header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
@@ -261,14 +260,14 @@ class NotesDataTable(aqt.qt.QWidget):
             cell_text = item.text()
 
             # There is padding of other widgets that are hard to control, so to account for that extra space is added
-            extra_safety_space = style.EXTRA_SAFETY_SPACE_PADDING
+            extra_safety_space = ui_constants.EXTRA_SAFETY_SPACE_PADDING
 
-            usable_width = self.table.columnWidth(col) - (style.TABLE_ITEM_PADDING * 2) - extra_safety_space
+            usable_width = self.table.columnWidth(col) - (ui_constants.TABLE_ITEM_PADDING * 2) - extra_safety_space
             bounding_rect = font_metrics.boundingRect(
                 0, 0, usable_width, 10000, aqt.qt.Qt.TextFlag.TextWordWrap, cell_text
             )
 
-            required_height_for_cell = bounding_rect.height() + (style.TABLE_ITEM_PADDING * 2) + extra_safety_space
+            required_height_for_cell = bounding_rect.height() + (ui_constants.TABLE_ITEM_PADDING * 2) + extra_safety_space
 
             if required_height_for_cell > required_height_for_row:
                 required_height_for_row = required_height_for_cell
@@ -320,7 +319,8 @@ class NotesDataTable(aqt.qt.QWidget):
                 field_strip_settings: dict = self.selected_fields_settings.get(field_name, {})
 
                 original_data_item = aqt.qt.QTableWidgetItem(field_data)
-                processed_data_item = aqt.qt.QTableWidgetItem(gui_utils.get_processed_text(field_data, field_strip_settings))
+                processed_data_item = aqt.qt.QTableWidgetItem(
+                    gui_utils.get_processed_text(field_data, field_strip_settings))
 
                 self.table.setItem(row, col, original_data_item)
                 self.table.setItem(row, col + 1, processed_data_item)
@@ -330,7 +330,7 @@ class NotesDataTable(aqt.qt.QWidget):
                 self._highlight_row_as_invalid(row)
 
     def _highlight_row_as_invalid(self, row: int) -> None:
-        red_color = aqt.qt.QColor(style.WRONG_CARD_TYPE_COLOR)
+        red_color = aqt.qt.QColor(ui_constants.WRONG_CARD_TYPE_COLOR)
 
         for col in range(self.table.columnCount()):
             item = self.table.item(row, col)

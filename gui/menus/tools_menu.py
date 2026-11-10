@@ -1,7 +1,7 @@
 import aqt
 from aqt import mw
 
-from .api_keys_configuration import ApiKeysConfigurationDialog
+from ..api_keys_configuration import ApiKeysConfigurationDialog
 
 def open_api_key_configuration_dialog() -> None:
     api_keys_configuration_dialog = ApiKeysConfigurationDialog(mw)
