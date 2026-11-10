@@ -453,9 +453,8 @@ class SettingTabs(aqt.qt.QTabWidget):
         self.fields_setting_tab = FieldsSettingsTab()
         self.general_settings_tab = GeneralSettingsTab()
 
-        self.addTab(self.fields_setting_tab, "Fields settings")
         self.addTab(self.general_settings_tab, "General settings")
-
+        self.addTab(self.fields_setting_tab, "Fields settings")
 
 class FieldsSettingsTab(aqt.qt.QWidget):
     def __init__(self, parent=None) -> None:
