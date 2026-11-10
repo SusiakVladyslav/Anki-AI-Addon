@@ -14,9 +14,6 @@ from ..utils.constants import (
     CONFIG,
     ADDON_PACKAGE,
     OPENAI_ICON_PATH,
-    CLAUDE_ICON_PATH,
-    GEMINI_ICON_PATH,
-    DEEPSEEK_ICON_PATH,
     MODELS_INPUT_PRICES,
     MODELS_OUTPUT_PRICES
 )
@@ -220,12 +217,6 @@ def convert_company_name_to_api_key(company_name: str) -> str:
     match company_name:
         case "OpenAI":
             return "OPENAI_API_KEY"
-        case "Claude":
-            return "CLAUDE_API_KEY"
-        case "Gemini":
-            return "GEMINI_API_KEY"
-        case "DeepSeek":
-            return "DEEPSEEK_API_KEY"
         case _:
             return ""
 
@@ -234,9 +225,6 @@ def get_company_icon(company_name: str) -> aqt.qt.QIcon:
 
     company_to_icon = {
         "OpenAI": get_colored_icon(OPENAI_ICON_PATH, anki_text_color),
-        "Claude": aqt.qt.QIcon(CLAUDE_ICON_PATH),
-        "Gemini": aqt.qt.QIcon(GEMINI_ICON_PATH),
-        "DeepSeek": aqt.qt.QIcon(DEEPSEEK_ICON_PATH)
     }
 
     return company_to_icon[company_name]
@@ -244,10 +232,8 @@ def get_company_icon(company_name: str) -> aqt.qt.QIcon:
 def model_to_company_name(model: str) -> str:
     if "gpt" in model.lower():
         return "OpenAI"
-    if "gemini" in model.lower():
-        return "Gemini"
-    else:
-        return "DeepSeek"
+
+    return ""
 
 def calculate_spent_money(input_tokens: int, output_tokens: int, model: str) -> tuple[float, float, float]:
     price_per_1_million_input_tokens = MODELS_INPUT_PRICES[model]
