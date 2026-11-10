@@ -13,11 +13,8 @@ EYE_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye.svg")
 EYE_OFF_ICON_PATH = os.path.join(ROOT_DIR, "icons", "eye_off.svg")
 
 OPENAI_ICON_PATH = os.path.join(ROOT_DIR, "icons", "openai_logo.svg")
-CLAUDE_ICON_PATH = os.path.join(ROOT_DIR, "icons", "claude_logo.svg")
-GEMINI_ICON_PATH = os.path.join(ROOT_DIR, "icons", "gemini_logo.svg")
-DEEPSEEK_ICON_PATH = os.path.join(ROOT_DIR, "icons", "deepseek_logo.svg")
 
-AVAILABLE_COMPANIES = ["OpenAI", "Claude", "Gemini", "DeepSeek"]
+AVAILABLE_COMPANIES = ["OpenAI"]
 
 OPENAI_API_KEY: Final = CONFIG.get("OPENAI_API_KEY").strip()
 MODEL: Final = CONFIG.get("Model")
