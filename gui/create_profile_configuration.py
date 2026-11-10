@@ -259,7 +259,6 @@ class ProfileCreationSettings(aqt.qt.QWidget):
         self._update_fields_selection_check_boxes_on_card_type_switch()
         self._update_ai_model_prices_on_ai_model_switch()
 
-        self._update_expected_io_text_edits_on_selected_fields_toggle()
         self._update_fields_setting_combo_box_on_selected_fields_toggle()
         self._update_fields_settings_on_selected_fields_toggle()
 
@@ -297,11 +296,6 @@ class ProfileCreationSettings(aqt.qt.QWidget):
 
         self.ai_models_combo_box.ai_model_switch_signal.connect(
             self.ai_model_prices.set_output_price
-        )
-
-    def _update_expected_io_text_edits_on_selected_fields_toggle(self) -> None:
-        self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
-            self.settings_tabs.expected_input_and_output.update_text_edits
         )
 
     def _update_fields_setting_combo_box_on_selected_fields_toggle(self) -> None:
@@ -456,67 +450,11 @@ class SettingTabs(aqt.qt.QTabWidget):
         self.setting_widget = aqt.qt.QWidget()
         self.setting_layout = aqt.qt.QVBoxLayout(self.setting_widget)
 
-        self.expected_input_and_output = ExpectedInputAndOutput()
         self.fields_setting_tab = FieldsSettingsTab()
         self.general_settings_tab = GeneralSettingsTab()
 
         self.addTab(self.fields_setting_tab, "Fields settings")
-        self.addTab(self.expected_input_and_output, "Expected Input and Output")
         self.addTab(self.general_settings_tab, "General settings")
-
-
-class ExpectedInputAndOutput(aqt.qt.QWidget):
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-
-        field_layout = aqt.qt.QGridLayout(self)
-
-        expected_input_label = aqt.qt.QLabel("Expected input for AI is:")
-        expected_input_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
-
-        expected_output_label = aqt.qt.QLabel("Expected output from AI is:")
-        expected_output_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
-
-        self.font = aqt.qt.QFont()
-        self.font.setPointSize(12)
-
-        self.expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
-        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")
-        self.expected_fields_input_to_ai_text_edit.setReadOnly(True)
-
-        self.expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
-        self.expected_output_from_ai_text_edit.setToolTip("This is how the output from AI should look like")
-        self.expected_output_from_ai_text_edit.setReadOnly(True)
-
-        self.expected_fields_input_to_ai_text_edit.setFont(self.font)
-        self.expected_output_from_ai_text_edit.setFont(self.font)
-
-        self.expected_fields_input_to_ai_text_edit.setLineWrapMode(
-            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
-        )
-        self.expected_fields_input_to_ai_text_edit.setHorizontalScrollBarPolicy(
-            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-
-        self.expected_output_from_ai_text_edit.setLineWrapMode(
-            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
-        )
-        self.expected_output_from_ai_text_edit.setHorizontalScrollBarPolicy(
-            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-
-        field_layout.addWidget(expected_input_label, 0, 0)
-        field_layout.addWidget(expected_output_label, 0, 1)
-        field_layout.addWidget(self.expected_fields_input_to_ai_text_edit, 1, 0)
-        field_layout.addWidget(self.expected_output_from_ai_text_edit, 1, 1)
-
-    def update_text_edits(self, fields_status: dict[str, bool]) -> None:
-        selected_fields = [field for field, value in fields_status.items() if value]
-        input_text = "".join(f"{field}|{{Field Data}}\n" for field in selected_fields)
-        output_text = "".join(f"{field}|{{Generated Data}}\n" for field in selected_fields)
-
-        self.expected_fields_input_to_ai_text_edit.setPlainText(input_text)
-        self.expected_output_from_ai_text_edit.setPlainText(output_text)
 
 
 class FieldsSettingsTab(aqt.qt.QWidget):
