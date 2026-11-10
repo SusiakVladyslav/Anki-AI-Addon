@@ -1,7 +1,7 @@
 from aqt.browser import Browser
 from aqt.utils import showInfo, showWarning, showCritical, askUser
 
-from . import style
+from . import ui_constants
 from ..utils import constants
 
 
@@ -47,7 +47,7 @@ def successful_notes_generation(
     )
 
 def profile_name_is_too_long_warning(profile_name: str, parent) -> None:
-    showWarning(f'Profile name "{profile_name}" is longer than {style.PROFILE_NAME_MAX_LENGTH} characters. '
+    showWarning(f'Profile name "{profile_name}" is longer than {ui_constants.PROFILE_NAME_MAX_LENGTH} characters. '
                 f'Please write a shorter profile name.', parent=parent)
 
 def profile_name_cant_be_empty_warning(parent) -> None:

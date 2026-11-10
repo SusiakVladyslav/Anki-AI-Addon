@@ -8,9 +8,9 @@ from typing import Any
 import html
 import re
 
-from . import dialogs
-from . import style
-from ..utils.constants import (
+from ..gui import notifications
+from ..gui import ui_constants
+from .constants import (
     CONFIG,
     ADDON_PACKAGE,
     OPENAI_ICON_PATH,
@@ -25,14 +25,14 @@ def insert_profile_settings_in_config(profile_settings_dict: dict[str, dict[str,
         profile_name = next(iter(profile_settings_dict))
 
         if profile_name in profiles_dict:
-            dialogs.profile_with_such_name_already_exists(profile_name)
+            notifications.profile_with_such_name_already_exists(profile_name)
             return False
         else:
             profiles_dict.update(profile_settings_dict)
             mw.addonManager.writeConfig(ADDON_PACKAGE, CONFIG)
             return True
     else:
-        dialogs.config_not_found_error()
+        notifications.config_not_found_error()
         return False
 
 def update_profile_settings(original_profile_name, edited_profile_settings_dict: dict[str, dict[str, Any]]):
@@ -45,7 +45,7 @@ def update_profile_settings(original_profile_name, edited_profile_settings_dict:
 
         else:
             if edited_profile_name in profiles_dict:
-                dialogs.profile_with_such_name_already_exists(edited_profile_name)
+                notifications.profile_with_such_name_already_exists(edited_profile_name)
                 return False
 
             new_profiles_dict = sort_profiles_dict(original_profile_name, edited_profile_settings_dict, profiles_dict)
@@ -57,7 +57,7 @@ def update_profile_settings(original_profile_name, edited_profile_settings_dict:
         return True
 
     else:
-        dialogs.config_not_found_error()
+        notifications.config_not_found_error()
         return False
 
 
@@ -65,14 +65,14 @@ def update_profile_settings_name(profile_settings_dict, profile_name_was_edited:
     if CONFIG:
         profiles_dict = CONFIG.setdefault("Profiles", {})
     else:
-        dialogs.config_not_found_error()
+        notifications.config_not_found_error()
         return False
 
     profile_name = next(iter(profile_settings_dict))
 
     if profile_name_was_edited:
         if profile_name in profiles_dict:
-            dialogs.profile_with_such_name_already_exists(profile_name)
+            notifications.profile_with_such_name_already_exists(profile_name)
             return False
 
         if not original_profile_name:
@@ -246,7 +246,7 @@ def calculate_spent_money(input_tokens: int, output_tokens: int, model: str) -> 
 
 def profile_name_is_too_long(profile: dict[str, dict[str, Any]]) -> bool:
     profile_name = next(iter(profile))
-    if len(profile_name) > style.PROFILE_NAME_MAX_LENGTH:
+    if len(profile_name) > ui_constants.PROFILE_NAME_MAX_LENGTH:
         return True
 
     return False
