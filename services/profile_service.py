@@ -7,10 +7,10 @@ from aqt.browser import Browser
 from typing import Any
 import json
 
-from ..gui import dialogs
-from ..gui import gui_utils
+from ..gui import notifications
+from ..utils import gui_utils
 from ..ai.openai_requests import send_open_ai_request, AiOutput
-from ..gui import style
+from ..gui import ui_constants
 
 
 class ProfileService:
@@ -51,7 +51,7 @@ class ProfileService:
             model = self.ai_model
         )
 
-        dialogs.successful_notes_generation(
+        notifications.successful_notes_generation(
             time_spent=ai_output.time_spent,
             input_tokens=ai_output.input_tokens,
             output_tokens=ai_output.output_tokens,
@@ -67,14 +67,14 @@ class ProfileService:
 
         if self.generate_as_new_cards:
             self._create_new_notes(generated_notes)
-            dialogs.show_successful_notes_creation(
+            notifications.show_successful_notes_creation(
                 amount_of_notes=len(generated_notes),
                 creation_deck=self.deck_for_generated_cards,
                 parent=self.browser
             )
         else:
             self._replace_existing_notes(generated_notes, notes)
-            dialogs.show_successful_notes_replacement(parent=self.browser)
+            notifications.show_successful_notes_replacement(parent=self.browser)
 
         self.browser.onSearchActivated()
         if self.browser.editor.note:
@@ -206,18 +206,18 @@ class PreviewTableDialog(aqt.qt.QDialog):
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                gridline-color: {style.GRAY_GRIDLINE_COLOR};
-                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+                gridline-color: {ui_constants.GRAY_GRIDLINE_COLOR};
+                font-size: {ui_constants.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QTableWidget::item {{
-                padding: {style.TABLE_ITEM_PADDING}px;
-                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+                padding: {ui_constants.TABLE_ITEM_PADDING}px;
+                font-size: {ui_constants.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QTableWidget QLabel {{
-                font-size: {style.QTABLEWIDGET_FONT_SIZE}pt;
+                font-size: {ui_constants.QTABLEWIDGET_FONT_SIZE}pt;
             }}
             QHeaderView::section {{
-                font-size: {style.QTABLEWIDGET_HEADER_FONT_SIZE}pt;
+                font-size: {ui_constants.QTABLEWIDGET_HEADER_FONT_SIZE}pt;
             }}
         """)
 
@@ -225,12 +225,12 @@ class PreviewTableDialog(aqt.qt.QDialog):
         self.v_header = self.table.verticalHeader()
 
         self.header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
-        self.header.setDefaultSectionSize(style.TABLE_COLUMN_WIDTH)
+        self.header.setDefaultSectionSize(ui_constants.TABLE_COLUMN_WIDTH)
 
         for row in range(self.table.rowCount()):
             required_height_for_row = self._calculate_row_height(row)
             self.table.setRowHeight(
-                row, min(required_height_for_row, style.TABLE_MAX_ROW_HEIGHT)
+                row, min(required_height_for_row, ui_constants.TABLE_MAX_ROW_HEIGHT)
             )
 
         self.v_header.setSectionResizeMode(aqt.qt.QHeaderView.ResizeMode.Interactive)
@@ -254,5 +254,5 @@ class PreviewTableDialog(aqt.qt.QDialog):
             )
 
         # There is padding of other widgets that are hard to control, so to account for that extra space is added
-        extra_safety_space = style.EXTRA_SAFETY_SPACE_PADDING
-        return required_height_for_row + style.TABLE_ITEM_PADDING * 2 + extra_safety_space
+        extra_safety_space = ui_constants.EXTRA_SAFETY_SPACE_PADDING
+        return required_height_for_row + ui_constants.TABLE_ITEM_PADDING * 2 + extra_safety_space
