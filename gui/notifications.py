@@ -2,7 +2,7 @@ from aqt.browser import Browser
 from aqt.utils import showInfo, showWarning, showCritical, askUser
 
 from . import ui_constants
-from ..utils import constants
+from utils import constants
 
 
 def show_successful_notes_creation(creation_deck: str, amount_of_notes: int, parent: Browser) -> None:

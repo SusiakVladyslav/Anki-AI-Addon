@@ -8,8 +8,8 @@ from typing import Any
 import html
 import re
 
-from ..gui import notifications
-from ..gui import ui_constants
+from gui import notifications
+from gui import ui_constants
 from .constants import (
     CONFIG,
     ADDON_PACKAGE,
@@ -177,18 +177,23 @@ def strip_html(text: str) -> str:
 
 
 def strip_square_brackets(text: str) -> str:
-    # Match only square brackets [...] across multiple lines
-    pattern = r"\[[^\]]*\]"
-    cleaned_text = re.sub(pattern, "", text, flags=re.DOTALL)
+    # Match bracket pairs that contain NO nested brackets inside them
+    pattern = r"\[[^\[\]]*\]"
 
-    # Clean up any leftover double spaces
-    cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip()
+    # Continuously collapse inner brackets until none remain
+    while re.search(pattern, text, flags=re.DOTALL):
+        text = re.sub(pattern, "", text, flags=re.DOTALL)
 
-    return cleaned_text
+    # Clean up any leftover multiple spaces and strip ends
+    return re.sub(r"\s+", " ", text).strip()
 
 def convert_cloze_to_plain_text(text: str):
-    pattern = r"\{\{c\d+::([^:#\}]+)(?:::[^\}]*)?\}\}"
+    pattern = r"\{\{c\d+::(.*?)(?:::.*?)?\}\}"
     return re.sub(pattern, r"\1", text)
+
+def strip_non_ascii(text: str) -> str:
+    # Encodes the string to ASCII ignoring non-ASCII characters and then decodes back to string
+    return text.encode("ascii", "ignore").decode("ascii")
 
 def get_processed_text(field_data: str, field_strip_settings: dict[str, bool]) -> str:
     processed_field_data = field_data
@@ -200,8 +205,7 @@ def get_processed_text(field_data: str, field_strip_settings: dict[str, bool]) -
     if field_strip_settings.get("convert_cloze", False):
         processed_field_data = convert_cloze_to_plain_text(processed_field_data)
     if field_strip_settings.get("strip_non_ascii", False):
-        # Encodes the string to ASCII ignoring non-ASCII characters and then decodes back to string
-        processed_field_data = processed_field_data.encode("ascii", "ignore").decode("ascii")
+        processed_field_data = strip_square_brackets(processed_field_data)
 
     return processed_field_data
 
