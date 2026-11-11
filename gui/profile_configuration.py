@@ -5,10 +5,10 @@ from typing import Any
 import copy
 from dataclasses import dataclass
 
-from . import gui_utils
+from ..utils import gui_utils
 from ..utils.constants import AVAILABLE_MODELS, MODELS_INPUT_PRICES, MODELS_OUTPUT_PRICES
-from . import style
-from . import dialogs
+from . import ui_constants
+from . import notifications
 
 class DialogMode:
     @dataclass
@@ -107,7 +107,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
     def confirm_settings_changes_discard(self) -> bool:
         if self.config != self._collect_profile_settings():
-            return dialogs.confirm_unsaved_changes_discard(parent=self)
+            return notifications.confirm_unsaved_changes_discard(parent=self)
         else:
             return True
 
@@ -170,42 +170,42 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
         profile_name = next(iter(profile))
 
         if profile_name == "":
-            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            notifications.profile_name_cant_be_empty_warning(parent=self.parent)
             return
 
         if gui_utils.profile_name_is_too_long(profile):
-            dialogs.profile_name_is_too_long_warning(profile_name, parent=self.parent)
+            notifications.profile_name_is_too_long_warning(profile_name, parent=self.parent)
             return
 
         if len(profile[profile_name]["selected_fields"]) == 0:
-            dialogs.no_fields_were_selected(parent=self.parent)
+            notifications.no_fields_were_selected(parent=self.parent)
             return
 
         if gui_utils.insert_profile_settings_in_config(profile):
             self.accept()
-            dialogs.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
+            notifications.profile_was_successfully_created(profile_name=profile_name, parent=self.parent)
 
     def _update_profile_settings(self) -> None:
         edited_profile: dict[str, dict[str, Any]] = self._collect_profile_settings()
         edited_profile_name = next(iter(edited_profile))
 
         if edited_profile_name == "":
-            dialogs.profile_name_cant_be_empty_warning(parent=self.parent)
+            notifications.profile_name_cant_be_empty_warning(parent=self.parent)
             return
 
         if gui_utils.profile_name_is_too_long(edited_profile):
-            dialogs.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
+            notifications.profile_name_is_too_long_warning(edited_profile_name, parent=self.parent)
             return
 
         if len(edited_profile[edited_profile_name]["selected_fields"]) == 0:
-            dialogs.no_fields_were_selected(parent=self.parent)
+            notifications.no_fields_were_selected(parent=self.parent)
             return
 
         if self.original_profile_name == edited_profile_name:
             if gui_utils.update_profile_settings_name(edited_profile, profile_name_was_edited=False):
                 self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+                notifications.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
         else:
             if gui_utils.update_profile_settings_name(
                 edited_profile,
@@ -214,7 +214,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
             ):
                 self.profile_settings_changed.emit(edited_profile)
                 self.accept()  # TODO Do I need still this accept function here?
-                dialogs.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
+                notifications.profile_was_successfully_edited(edited_profile_name, parent=self.parent)
 
 
 class PromptTextEditLayout(aqt.qt.QWidget):
@@ -226,7 +226,7 @@ class PromptTextEditLayout(aqt.qt.QWidget):
         self.prompt_label = aqt.qt.QLabel("Prompt")
         self.prompt_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
 
-        self.setStyleSheet(f"""QLabel {{font-size: {style.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
+        self.setStyleSheet(f"""QLabel {{font-size: {ui_constants.CREATE_PROFILE_PROMPT_LABEL_FONT_SIZE}pt;}}""")
 
         self.prompt_text_edit = aqt.qt.QPlainTextEdit()
         self.prompt_text_edit.setSizePolicy(aqt.qt.QSizePolicy.Policy.Expanding, aqt.qt.QSizePolicy.Policy.Expanding)
@@ -259,7 +259,6 @@ class ProfileCreationSettings(aqt.qt.QWidget):
         self._update_fields_selection_check_boxes_on_card_type_switch()
         self._update_ai_model_prices_on_ai_model_switch()
 
-        self._update_expected_io_text_edits_on_selected_fields_toggle()
         self._update_fields_setting_combo_box_on_selected_fields_toggle()
         self._update_fields_settings_on_selected_fields_toggle()
 
@@ -297,11 +296,6 @@ class ProfileCreationSettings(aqt.qt.QWidget):
 
         self.ai_models_combo_box.ai_model_switch_signal.connect(
             self.ai_model_prices.set_output_price
-        )
-
-    def _update_expected_io_text_edits_on_selected_fields_toggle(self) -> None:
-        self.fields_selection_check_boxes.selected_fields_toggle_signal.connect(
-            self.settings_tabs.expected_input_and_output.update_text_edits
         )
 
     def _update_fields_setting_combo_box_on_selected_fields_toggle(self) -> None:
@@ -456,68 +450,11 @@ class SettingTabs(aqt.qt.QTabWidget):
         self.setting_widget = aqt.qt.QWidget()
         self.setting_layout = aqt.qt.QVBoxLayout(self.setting_widget)
 
-        self.expected_input_and_output = ExpectedInputAndOutput()
         self.fields_setting_tab = FieldsSettingsTab()
         self.general_settings_tab = GeneralSettingsTab()
 
-        self.addTab(self.fields_setting_tab, "Fields settings")
-        self.addTab(self.expected_input_and_output, "Expected Input and Output")
         self.addTab(self.general_settings_tab, "General settings")
-
-
-class ExpectedInputAndOutput(aqt.qt.QWidget):
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-
-        field_layout = aqt.qt.QGridLayout(self)
-
-        expected_input_label = aqt.qt.QLabel("Expected input for AI is:")
-        expected_input_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
-
-        expected_output_label = aqt.qt.QLabel("Expected output from AI is:")
-        expected_output_label.setSizePolicy(aqt.qt.QSizePolicy.Policy.Fixed, aqt.qt.QSizePolicy.Policy.Fixed)
-
-        self.font = aqt.qt.QFont()
-        self.font.setPointSize(12)
-
-        self.expected_fields_input_to_ai_text_edit = aqt.qt.QPlainTextEdit()
-        self.expected_fields_input_to_ai_text_edit.setToolTip("This is how the input to AI will look like")
-        self.expected_fields_input_to_ai_text_edit.setReadOnly(True)
-
-        self.expected_output_from_ai_text_edit = aqt.qt.QPlainTextEdit()
-        self.expected_output_from_ai_text_edit.setToolTip("This is how the output from AI should look like")
-        self.expected_output_from_ai_text_edit.setReadOnly(True)
-
-        self.expected_fields_input_to_ai_text_edit.setFont(self.font)
-        self.expected_output_from_ai_text_edit.setFont(self.font)
-
-        self.expected_fields_input_to_ai_text_edit.setLineWrapMode(
-            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
-        )
-        self.expected_fields_input_to_ai_text_edit.setHorizontalScrollBarPolicy(
-            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-
-        self.expected_output_from_ai_text_edit.setLineWrapMode(
-            aqt.qt.QPlainTextEdit.LineWrapMode.NoWrap
-        )
-        self.expected_output_from_ai_text_edit.setHorizontalScrollBarPolicy(
-            aqt.qt.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-
-        field_layout.addWidget(expected_input_label, 0, 0)
-        field_layout.addWidget(expected_output_label, 0, 1)
-        field_layout.addWidget(self.expected_fields_input_to_ai_text_edit, 1, 0)
-        field_layout.addWidget(self.expected_output_from_ai_text_edit, 1, 1)
-
-    def update_text_edits(self, fields_status: dict[str, bool]) -> None:
-        selected_fields = [field for field, value in fields_status.items() if value]
-        input_text = "".join(f"{field}|{{Field Data}}\n" for field in selected_fields)
-        output_text = "".join(f"{field}|{{Generated Data}}\n" for field in selected_fields)
-
-        self.expected_fields_input_to_ai_text_edit.setPlainText(input_text)
-        self.expected_output_from_ai_text_edit.setPlainText(output_text)
-
+        self.addTab(self.fields_setting_tab, "Fields settings")
 
 class FieldsSettingsTab(aqt.qt.QWidget):
     def __init__(self, parent=None) -> None:

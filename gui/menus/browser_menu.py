@@ -2,11 +2,12 @@ from aqt.qt import QMenu, QAction, qconnect
 from aqt.browser import Browser
 import aqt
 
-from .create_profile_configuration import ProfileConfigurationDialog, DialogMode
-from .apply_profile_window import ApplyProfileDialog
-from .. utils.constants import CONFIG, MAX_NOTES_TO_APPLY
-from . import style, gui_utils
-from . import dialogs
+from ..profile_configuration import ProfileConfigurationDialog, DialogMode
+from ..profile_preview_dialog import ApplyProfileDialog
+from ...utils.constants import CONFIG, MAX_NOTES_TO_APPLY
+from .. import ui_constants
+from ...utils import gui_utils
+from .. import notifications
 
 
 def setup_browser_menu(browser: Browser) -> None:
@@ -21,7 +22,7 @@ def populate_ai_generation_profiles_menu(generation_profiles_menu: QMenu, browse
     profile_dicts = CONFIG.setdefault("Profiles", {})
     profile_names = list(profile_dicts.keys())
 
-    if len(profile_names) > style.MAX_VISIBLE_PROFILES:
+    if len(profile_names) > ui_constants.MAX_VISIBLE_PROFILES:
         setup_scrollable_profile_buttons(generation_profiles_menu, profile_names, browser)
     else:
         setup_standard_profile_buttons(generation_profiles_menu, profile_names, browser)
@@ -53,18 +54,18 @@ def setup_scrollable_profile_buttons(generation_profiles_menu: QMenu, profile_na
     for profile_name in profile_names:
         btn = aqt.qt.QPushButton(profile_name)
         btn.setToolTip(profile_name)
-        btn.setFixedHeight(style.MENU_BUTTON_HEIGHT)
+        btn.setFixedHeight(ui_constants.MENU_BUTTON_HEIGHT)
         btn.setCursor(aqt.Qt.CursorShape.PointingHandCursor)  # It changes the cursor to pointing hand on hover
 
         btn.setStyleSheet(f"""
                     QPushButton {{
                         text-align: left;
-                        padding: {style.MENU_BUTTON_LR_PADDING}px {style.MENU_BUTTON_TB_PADDING}px;
+                        padding: {ui_constants.MENU_BUTTON_LR_PADDING}px {ui_constants.MENU_BUTTON_TB_PADDING}px;
                         border: none;
                         background: transparent;
                     }}
                     QPushButton:hover {{
-                        background-color: {style.MENU_BUTTON_HOVER_BG_COLOR};
+                        background-color: {ui_constants.MENU_BUTTON_HOVER_BG_COLOR};
                     }}
                 """)
 
@@ -76,13 +77,13 @@ def setup_scrollable_profile_buttons(generation_profiles_menu: QMenu, profile_na
     container_widget.setLayout(layout)
     scroll_area.setWidget(container_widget)
 
-    min_menu_width = style.MIN_SCROLLABLE_MENU_WIDTH
+    min_menu_width = ui_constants.MIN_SCROLLABLE_MENU_WIDTH
     longest_profile_width = gui_utils.calculate_longest_profile_width(generation_profiles_menu, profile_names)
 
     width_padding = 40
     height_padding = 8
     calculated_width = max(min_menu_width, longest_profile_width + width_padding)
-    calculated_height = (style.MAX_VISIBLE_PROFILES * style.MENU_BUTTON_HEIGHT) + height_padding
+    calculated_height = (ui_constants.MAX_VISIBLE_PROFILES * ui_constants.MENU_BUTTON_HEIGHT) + height_padding
 
     scroll_area.setFixedHeight(calculated_height)
     scroll_area.setFixedWidth(calculated_width)
@@ -112,7 +113,7 @@ def open_apply_profile_dialog(browser: Browser, profile_name: str, generation_pr
         apply_profile_dialog.finished.connect(lambda: populate_ai_generation_profiles_menu(generation_profiles_menu, browser))
         apply_profile_dialog.open()
     else:
-        dialogs.too_many_notes_were_selected_warning(parent=browser)
+        notifications.too_many_notes_were_selected_warning(parent=browser)
 
 def open_configuration_dialog(browser: Browser, generation_profiles_menu: QMenu) -> None:
     configuration_dialog = ProfileConfigurationDialog(mode=DialogMode.Create, parent=browser)
