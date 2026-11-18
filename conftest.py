@@ -18,7 +18,41 @@ class DummyQDialog:
     def accept(self): pass
     def reject(self): pass
 
+
+class DummyQWidget:
+    def __init__(self, parent=None):
+        pass
+
+    def setStyleSheet(self, style): pass
+    def setToolTip(self, tip): pass
+    def setFixedWidth(self, w): pass
+    def setFixedHeight(self, h): pass
+    def findChildren(self, cls): return []
+
+    def __getattr__(self, name:str):
+        return MagicMock()
+
+
 qt_mock.QDialog = DummyQDialog
+qt_mock.QWidget = DummyQWidget
+qt_mock.QComboBox = DummyQWidget
+qt_mock.QTabWidget = DummyQWidget
+qt_mock.QTableWidget = DummyQWidget
+qt_mock.QGridLayout = DummyQWidget
+
+# 2. Qt widgets instantiated directly inside __init__ (each call gets an isolated MagicMock)
+for widget_name in (
+    "QDialogButtonBox",
+    "QCheckBox",
+    "QLabel",
+    "QLineEdit",
+    "QPlainTextEdit",
+    "QPushButton",
+    "QTableWidgetItem",
+    "QGraphicsOpacityEffect",
+):
+    setattr(qt_mock, widget_name, MagicMock(side_effect=lambda *args, **kwargs: MagicMock()))
+
 qt_mock.pyqtSignal = lambda *args, **kwargs: MagicMock()
 
 mw_mock = MagicMock()

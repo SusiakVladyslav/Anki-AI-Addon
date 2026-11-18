@@ -1,9 +1,15 @@
 import copy
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 import pytest
 
 from ankiaddon.gui import profile_configuration
-from ankiaddon.gui.profile_configuration import DialogMode, ProfileConfigurationDialog
+from ankiaddon.gui.profile_configuration import (
+    DialogMode,
+    ProfileConfigurationDialog,
+    FieldsSettings,
+    FieldsSettingsComboBox,
+    FieldsSettingsTable
+)
 
 SAMPLE_PROFILE_NAME = "Korean Vocab Profile"
 
@@ -66,10 +72,8 @@ def test_init_create_mode(dialog_logic_deps):
     assert isinstance(dialog.mode, DialogMode.Create)
     assert dialog.original_profile_name is None
     assert not hasattr(dialog, "save_button")
+
     dialog_logic_deps["load"].assert_not_called()
-
-    print("BUTTON BOX CALLS:", dialog.commit_buttons_box.mock_calls)
-
     dialog.commit_buttons_box.rejected.connect.assert_called_once_with(dialog.reject)
     dialog.commit_buttons_box.accepted.connect.assert_called_once_with(dialog._insert_profile_settings)
 
@@ -302,3 +306,207 @@ def test_update_profile_settings_aborts_if_config_write_fails(dialog_logic_deps)
         dialog.profile_settings_changed.emit.assert_not_called()
         mock_accept.assert_not_called()
         dialog_logic_deps["notifications"].profile_was_successfully_edited.assert_not_called()
+
+
+def test_set_fields_to_combo_box_preserve_selection():
+    fields_settings_combo_box = FieldsSettingsComboBox()
+    fields_settings_combo_box.currentText = MagicMock(return_value="Back")
+    fields_settings_combo_box.clear = MagicMock()
+    fields_settings_combo_box.addItems = MagicMock()
+    fields_settings_combo_box.setCurrentText = MagicMock()
+
+
+    fields_settings_combo_box.set_fields_to_combo_box(
+        {"Front": True, "Back": True, "Image": False, "Audio": True}
+    )
+
+    fields_settings_combo_box.clear.assert_called_once()
+    fields_settings_combo_box.addItems.assert_called_once_with(["Front", "Back", "Audio"])
+    fields_settings_combo_box.setCurrentText.assert_called_once_with("Back")
+
+
+def test_set_fields_to_combo_box_change_selection():
+    fields_settings_combo_box = FieldsSettingsComboBox()
+    fields_settings_combo_box.currentText = MagicMock(return_value="Image")
+    fields_settings_combo_box.clear = MagicMock()
+    fields_settings_combo_box.addItems = MagicMock()
+    fields_settings_combo_box.setCurrentText = MagicMock()
+
+    fields_settings_combo_box.set_fields_to_combo_box(
+        {"Front": True, "Back": True, "Image": False}
+    )
+
+    fields_settings_combo_box.clear.assert_called_once()
+    fields_settings_combo_box.addItems.assert_called_once_with(["Front", "Back"])
+    fields_settings_combo_box.setCurrentText.assert_not_called()
+
+
+def test_fields_settings_sync_preserves_existing_and_removes_unchecked():
+    fields_settings = FieldsSettings()
+    fields_settings.fields_settings_changed = MagicMock()
+
+    fields_settings._field_data = {
+        "Front": {
+                "strip_html": True,
+                "strip_brackets": False,
+                "convert_cloze": False,
+                "strip_non_ascii": False
+        },
+        "Back": {
+                "strip_html": False,
+                "strip_brackets": True,
+                "convert_cloze": False,
+                "strip_non_ascii": False
+        }
+    }
+
+    fields_status = {
+        "Front": True,
+        "Number": True,
+        "Back": True,
+        "Image": False
+    }
+
+    fields_settings.sync_with_selected_fields(fields_status)
+
+    expected = {
+        "Front": {
+            "strip_html": True,
+            "strip_brackets": False,
+            "convert_cloze": False,
+            "strip_non_ascii": False
+        },
+        "Number": {
+            "strip_html": False,
+            "strip_brackets": False,
+            "convert_cloze": False,
+            "strip_non_ascii": False
+        },
+        "Back": {
+            "strip_html": False,
+            "strip_brackets": True,
+            "convert_cloze": False,
+            "strip_non_ascii": False
+        }
+    }
+
+    assert fields_settings._field_data == expected
+    fields_settings.fields_settings_changed.emit.assert_called_once_with(expected)
+
+
+def test_load_field_settings():
+    fields_settings = FieldsSettings()
+    fields_settings.fields_settings_changed = MagicMock()
+
+    fields_settings._field_data = {
+        "Front": {
+            "strip_html": True,
+            "strip_brackets": False,
+            "convert_cloze": False,
+            "strip_non_ascii": False
+        },
+        "Back": {
+            "strip_html": False,
+            "strip_brackets": True,
+            "convert_cloze": True,
+            "strip_non_ascii": False
+        }
+    }
+
+    fields_settings.load_field_settings("Back")
+
+    assert fields_settings._current_field == "Back"
+    fields_settings.fields_setting_label.setText.assert_called_once_with(
+        f"{fields_settings._current_field} Field Settings:"
+    )
+
+    fields_settings.strip_html_check_box.setChecked.assert_called_once_with(False)
+    fields_settings.strip_brackets_check_box.setChecked.assert_called_once_with(True)
+    fields_settings.convert_cloze_check_box.setChecked.assert_called_once_with(True)
+    fields_settings.strip_non_ascii_check_box.setChecked.assert_called_once_with(False)
+
+    assert fields_settings.strip_html_check_box.blockSignals.call_args_list == [call(True), call(False)]
+    fields_settings.fields_settings_changed.emit.assert_not_called()
+
+
+def test_load_field_settings_ignores_unknown_field():
+    fields_settings = FieldsSettings()
+    fields_settings._current_field = "Front"
+    fields_settings._field_data = {
+        "Front": {
+            "strip_html": True,
+            "strip_brackets": False,
+            "convert_cloze": False,
+            "strip_non_ascii": False
+        },
+        "Back": {
+            "strip_html": False,
+            "strip_brackets": True,
+            "convert_cloze": True,
+            "strip_non_ascii": False
+        }
+    }
+
+    fields_settings.load_field_settings("NonExistentField")
+
+    assert fields_settings._current_field == "Front"
+    fields_settings.fields_setting_label.setText.assert_not_called()
+    fields_settings.strip_html_check_box.setChecked.assert_not_called()
+    fields_settings.strip_brackets_check_box.setChecked.assert_not_called()
+    fields_settings.convert_cloze_check_box.setChecked.assert_not_called()
+    fields_settings.strip_non_ascii_check_box.setChecked.assert_not_called()
+    fields_settings.fields_settings_changed.emit.assert_not_called()
+
+
+def test_load_fields_setting_data_populates_rows_and_cells():
+    table = FieldsSettingsTable()
+    table.setRowCount = MagicMock()
+    table.setItem = MagicMock()
+
+    fields_data = {
+        "Front": {
+            "strip_html": True,
+            "strip_brackets": False,
+            "convert_cloze": True,
+            "strip_non_ascii": False,
+        },
+        # Intentionally omit keys on "Back" to verify .get(..., False) fallback
+        "Back": {
+            "strip_brackets": True,
+        },
+    }
+
+    with (
+        patch.object(profile_configuration.aqt.qt, "QTableWidgetItem") as mock_text_item,
+        patch.object(profile_configuration.gui_utils, "create_table_check_item") as mock_check_item,
+    ):
+        mock_text_item.side_effect = lambda text: f"TextItem({text})"
+        mock_check_item.side_effect = lambda checked: f"CheckItem({checked})"
+
+        table.load_fields_setting_data(fields_data)
+
+    table.setRowCount.assert_called_once_with(2)
+    assert table.setItem.call_args_list == [
+        call(0, 0, "TextItem(Front)"),
+        call(0, 1, "CheckItem(True)"),
+        call(0, 2, "CheckItem(False)"),
+        call(0, 3, "CheckItem(True)"),
+        call(0, 4, "CheckItem(False)"),
+
+        call(1, 0, "TextItem(Back)"),
+        call(1, 1, "CheckItem(False)"),
+        call(1, 2, "CheckItem(True)"),
+        call(1, 3, "CheckItem(False)"),
+        call(1, 4, "CheckItem(False)"),
+    ]
+
+
+def test_load_fields_setting_data_clears_table_when_empty():
+    table = FieldsSettingsTable()
+    table.setRowCount = MagicMock()
+    table.setItem = MagicMock()
+
+    table.load_fields_setting_data({})
+
+    table.setRowCount.assert_called_once_with(0)
+    table.setItem.assert_not_called()
