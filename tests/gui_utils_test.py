@@ -1,28 +1,10 @@
-import sys
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
-anki_mock = MagicMock()
-aqt_mock = MagicMock()
-qt_mock = MagicMock()
+import copy
 
-mw_mock = MagicMock()
-mw_mock.addonManager.addon_from_module.return_value = "ankiaddon"
-aqt_mock.mw = mw_mock
-
-sys.modules["anki"] = anki_mock
-sys.modules["anki.hooks"] = anki_mock.hooks
-sys.modules["anki.notes"] = anki_mock.notes
-sys.modules["aqt"] = aqt_mock
-sys.modules["aqt.qt"] = qt_mock
-sys.modules["aqt.utils"] = aqt_mock.utils
-sys.modules["aqt.sound"] = aqt_mock.sound
-sys.modules["aqt.browser"] = aqt_mock.browser
-sys.modules["aqt.theme"] = aqt_mock.theme
-sys.modules["aqt.operations"] = aqt_mock.operations
-
-from utils.gui_utils import strip_html, strip_square_brackets, convert_cloze_to_plain_text, strip_non_ascii
-
+from ankiaddon.utils import gui_utils
+from ankiaddon.utils.gui_utils import strip_html, strip_square_brackets, convert_cloze_to_plain_text, strip_non_ascii
 
 @pytest.mark.parametrize(
     "html_text, clean_text",
@@ -127,3 +109,346 @@ def test_convert_cloze_to_plain_text(cloze_text: str, clean_text: str) -> None:
 def test_strip_non_ascii(input_text: str, expected_output: str) -> None:
     output = strip_non_ascii(input_text)
     assert output == expected_output
+
+SAMPLE_PROFILE = {
+        "Korean Profile (Proper Prompt)": {
+            "selected_card_type": "Korean Vocab",
+            "selected_fields": [
+                "Korean",
+                "English",
+                "Number"
+            ],
+            "selected_fields_settings": {
+                "Korean": {
+                    "strip_html": True,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                },
+                "English": {
+                    "strip_html": True,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                },
+                "Number": {
+                    "strip_html": True,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                }
+            },
+            "selected_model": "gpt-6-luna",
+            "generate_as_new_cards": False,
+            "deck_for_generated_cards": None,
+            "add_tag_to_generated_cards": False,
+            "tag_name_for_generated_cards": None,
+            "prompt_text": "You are a proficient Korean teacher. Enhance these cards"
+        }
+    }
+
+@pytest.fixture
+def sample_profile() -> dict:
+    return copy.deepcopy(SAMPLE_PROFILE)
+
+
+def test_insert_profile_settings_in_config_success(sample_profile: dict):
+    fake_config = {
+        "OPENAI_API_KEY": "",
+        "Profiles": {}
+    }
+
+    with (
+        patch.object(gui_utils, "CONFIG", fake_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+    ):
+        result = gui_utils.insert_profile_settings_in_config(sample_profile)
+
+        assert result == True
+        assert fake_config["Profiles"] == sample_profile
+        assert fake_config["OPENAI_API_KEY"] == ""
+        assert list(fake_config.keys()) == ["OPENAI_API_KEY", "Profiles"]
+
+        mock_mw.addonManager.writeConfig.assert_called_once_with("ankiaddon", fake_config)
+        mock_notifications.profile_with_such_name_already_exists.assert_not_called()
+        mock_notifications.config_not_found_error.assert_not_called()
+
+
+def test_insert_profile_settings_in_config_duplicate_name(sample_profile: dict):
+    already_existing_profile = copy.deepcopy(sample_profile)
+
+    fake_config = {
+        "OPENAI_API_KEY": "",
+        "Profiles": already_existing_profile
+    }
+
+    same_name_profile = {
+        "Korean Profile (Proper Prompt)": {
+            "selected_card_type": "Basic",
+            "selected_fields": [
+                "Front",
+                "Back"
+            ],
+            "selected_fields_settings": {
+                "Front": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                },
+                "Back": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                }
+            },
+            "selected_model": "gpt-6-astra",
+            "generate_as_new_cards": False,
+            "deck_for_generated_cards": None,
+            "add_tag_to_generated_cards": False,
+            "tag_name_for_generated_cards": None,
+            "prompt_text": "Enhance the cards"
+        }
+    }
+
+    with (
+        patch.object(gui_utils, "CONFIG", fake_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+    ):
+        result = gui_utils.insert_profile_settings_in_config(same_name_profile)
+
+    assert result == False
+    assert len(fake_config["Profiles"]) == 1
+    assert fake_config["Profiles"] == sample_profile
+    assert fake_config["OPENAI_API_KEY"] == ""
+    assert list(fake_config.keys()) == ["OPENAI_API_KEY", "Profiles"]
+
+    mock_mw.addonManager.writeConfig.assert_not_called()
+    mock_notifications.profile_with_such_name_already_exists.assert_called_once()
+    mock_notifications.config_not_found_error.assert_not_called()
+
+
+@pytest.mark.parametrize("empty_config", [None, {}])
+def test_insert_profile_settings_config_not_found(sample_profile, empty_config):
+    with (
+        patch.object(gui_utils, "CONFIG", empty_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+    ):
+        result = gui_utils.insert_profile_settings_in_config(sample_profile)
+
+        assert result is False
+        mock_notifications.config_not_found_error.assert_called_once()
+        mock_mw.addonManager.writeConfig.assert_not_called()
+        mock_notifications.profile_with_such_name_already_exists.assert_not_called()
+
+
+def test_update_profile_settings_same_name(sample_profile):
+    original_name = "Korean Profile (Proper Prompt)"
+    fake_config = {
+        "OPENAI_API_KEY": "",
+        "Profiles": copy.deepcopy(sample_profile),
+    }
+
+    edited_profile = copy.deepcopy(sample_profile)
+    edited_profile[original_name]["selected_model"] = "New Ai model"
+    edited_profile[original_name]["prompt_text"] = "Updated prompt text"
+
+    with (
+        patch.object(gui_utils, "CONFIG", fake_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+        patch.object(gui_utils, "sort_profiles_dict") as mock_sort,
+    ):
+        result = gui_utils.update_profile_settings_name(
+            edited_profile,
+            profile_name_was_edited=False,
+        )
+
+        assert result is True
+        assert fake_config["Profiles"][original_name]["selected_model"] == "New Ai model"
+        assert fake_config["Profiles"][original_name]["prompt_text"] == "Updated prompt text"
+        assert fake_config["OPENAI_API_KEY"] == ""
+        assert list(fake_config.keys()) == ["OPENAI_API_KEY", "Profiles"]
+        assert len(fake_config["Profiles"]) == 1
+
+        mock_sort.assert_not_called()
+        mock_mw.addonManager.writeConfig.assert_called_once_with("ankiaddon", fake_config)
+        mock_notifications.profile_with_such_name_already_exists.assert_not_called()
+        mock_notifications.config_not_found_error.assert_not_called()
+
+
+def test_update_profile_settings_rename_success(sample_profile):
+    original_name = "Korean Profile (Proper Prompt)"
+    new_name = "Korean Vocab v2"
+    second_profile = {
+        "Korean Profile (Make text red)": {
+            "selected_card_type": "Korean Vocab",
+            "selected_fields": [
+                "Korean",
+                "English"
+            ],
+            "selected_fields_settings": {
+                "Korean": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                },
+                "English": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                }
+            },
+            "selected_model": "gpt-6-luna",
+            "generate_as_new_cards": True,
+            "deck_for_generated_cards": "Test Deck",
+            "add_tag_to_generated_cards": False,
+            "tag_name_for_generated_cards": None,
+            "prompt_text": "Don't change the fields in any way(You can only change field color). Make fields red using HTML tags."
+    }
+}
+
+    existing_profiles = {
+        original_name: copy.deepcopy(sample_profile[original_name]),
+        **second_profile,
+    }
+
+    fake_config = {
+        "OPENAI_API_KEY": "",
+        "Profiles": copy.deepcopy(existing_profiles),
+    }
+
+    edited_profile = {
+        new_name: copy.deepcopy(sample_profile[original_name]),
+    }
+    sorted_result = {
+        new_name: copy.deepcopy(sample_profile[original_name]),
+        **second_profile,
+    }
+
+    with (
+        patch.object(gui_utils, "CONFIG", fake_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+        patch.object(gui_utils, "sort_profiles_dict", return_value=sorted_result) as mock_sort,
+    ):
+        result = gui_utils.update_profile_settings_name(
+                edited_profile,
+                profile_name_was_edited=True,
+                original_profile_name=original_name,
+            )
+
+        assert result is True
+        assert fake_config["Profiles"] == sorted_result
+        assert original_name not in fake_config["Profiles"]
+        assert fake_config["OPENAI_API_KEY"] == ""
+        assert list(fake_config.keys()) == ["OPENAI_API_KEY", "Profiles"]
+        assert len(fake_config["Profiles"]) == 2
+
+        mock_sort.assert_called_once()
+        mock_mw.addonManager.writeConfig.assert_called_once_with("ankiaddon", fake_config)
+        mock_notifications.profile_with_such_name_already_exists.assert_not_called()
+        mock_notifications.config_not_found_error.assert_not_called()
+
+
+def test_update_profile_settings_rename_duplicate_name(sample_profile):
+    original_name = "Korean Profile (Proper Prompt)"
+
+    second_profile = {
+        "Korean Profile (Make text red)": {
+            "selected_card_type": "Korean Vocab",
+            "selected_fields": [
+                "Korean",
+                "English"
+            ],
+            "selected_fields_settings": {
+                "Korean": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                },
+                "English": {
+                    "strip_html": False,
+                    "strip_brackets": False,
+                    "convert_cloze": False,
+                    "strip_non_ascii": False
+                }
+            },
+            "selected_model": "gpt-6-luna",
+            "generate_as_new_cards": True,
+            "deck_for_generated_cards": "Test Deck",
+            "add_tag_to_generated_cards": False,
+            "tag_name_for_generated_cards": None,
+            "prompt_text": "Don't change the fields in any way(You can only change field color). Make fields red using HTML tags."
+        }
+    }
+    second_profile_name = next(iter(second_profile))
+
+    existing_profiles = {
+        original_name: copy.deepcopy(sample_profile[original_name]),
+        **second_profile,
+    }
+
+    fake_config = {
+        "OPENAI_API_KEY": "",
+        "Profiles": copy.deepcopy(existing_profiles),
+    }
+
+    edited_profile = {
+        second_profile_name: sample_profile[original_name],
+    }
+
+    with (
+        patch.object(gui_utils, "CONFIG", fake_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+        patch.object(gui_utils, "sort_profiles_dict") as mock_sort,
+    ):
+        result = gui_utils.update_profile_settings_name(
+            edited_profile,
+            profile_name_was_edited=True,
+            original_profile_name=original_name,
+        )
+
+        assert result is False
+        assert fake_config["Profiles"] == existing_profiles
+        assert fake_config["OPENAI_API_KEY"] == ""
+        assert list(fake_config.keys()) == ["OPENAI_API_KEY", "Profiles"]
+        assert len(fake_config["Profiles"]) == 2
+
+        mock_notifications.profile_with_such_name_already_exists.assert_called_once_with(second_profile_name)
+        mock_sort.assert_not_called()
+        mock_mw.addonManager.writeConfig.assert_not_called()
+        mock_notifications.config_not_found_error.assert_not_called()
+
+
+@pytest.mark.parametrize("empty_config", [None, {}])
+def test_update_profile_settings_config_not_found(sample_profile, empty_config):
+    with (
+        patch.object(gui_utils, "CONFIG", empty_config),
+        patch.object(gui_utils, "ADDON_PACKAGE", "ankiaddon"),
+        patch.object(gui_utils, "mw") as mock_mw,
+        patch.object(gui_utils, "notifications") as mock_notifications,
+    ):
+        result = gui_utils.update_profile_settings_name(
+            sample_profile,
+            profile_name_was_edited=False,
+        )
+
+        assert result is False
+        mock_notifications.config_not_found_error.assert_called_once()
+        mock_mw.addonManager.writeConfig.assert_not_called()
+        mock_notifications.profile_with_such_name_already_exists.assert_not_called()

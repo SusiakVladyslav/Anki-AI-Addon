@@ -8,8 +8,9 @@ from typing import Any
 import html
 import re
 
-from gui import notifications
-from gui import ui_constants
+from ..gui import notifications
+from ..gui import ui_constants
+
 from .constants import (
     CONFIG,
     ADDON_PACKAGE,
@@ -31,31 +32,6 @@ def insert_profile_settings_in_config(profile_settings_dict: dict[str, dict[str,
             profiles_dict.update(profile_settings_dict)
             mw.addonManager.writeConfig(ADDON_PACKAGE, CONFIG)
             return True
-    else:
-        notifications.config_not_found_error()
-        return False
-
-def update_profile_settings(original_profile_name, edited_profile_settings_dict: dict[str, dict[str, Any]]):
-    if CONFIG:
-        profiles_dict = CONFIG.setdefault("Profiles", {})
-        edited_profile_name = next(iter(edited_profile_settings_dict))
-
-        if original_profile_name == edited_profile_name:
-            profiles_dict.update(edited_profile_settings_dict)
-
-        else:
-            if edited_profile_name in profiles_dict:
-                notifications.profile_with_such_name_already_exists(edited_profile_name)
-                return False
-
-            new_profiles_dict = sort_profiles_dict(original_profile_name, edited_profile_settings_dict, profiles_dict)
-            profiles_dict.clear()
-            profiles_dict.update(new_profiles_dict)
-
-        mw.addonManager.writeConfig(ADDON_PACKAGE, CONFIG)
-
-        return True
-
     else:
         notifications.config_not_found_error()
         return False
@@ -106,6 +82,7 @@ def delete_profile_from_config(profile_name: str):
     profiles.pop(profile_name)
 
     mw.addonManager.writeConfig(ADDON_PACKAGE, CONFIG)
+
 
 def get_profile_settings_from_config(profile_name: str) -> dict[str, type]:
     profile_settings = CONFIG.get("Profiles")[profile_name]
