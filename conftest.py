@@ -4,6 +4,22 @@ from unittest.mock import MagicMock
 anki_mock = MagicMock()
 aqt_mock = MagicMock()
 qt_mock = MagicMock()
+aqt_mock.qt = qt_mock
+
+class DummyQDialog:
+    def __init__(self, parent=None):
+        pass
+
+    def resize(self, w, h): pass
+    def setModal(self, modal): pass
+    def setSizeGripEnabled(self, enabled): pass
+    def setWindowTitle(self, title): pass
+    def findChildren(self, cls): return []
+    def accept(self): pass
+    def reject(self): pass
+
+qt_mock.QDialog = DummyQDialog
+qt_mock.pyqtSignal = lambda *args, **kwargs: MagicMock()
 
 mw_mock = MagicMock()
 mw_mock.addonManager.addon_from_module.return_value = "ankiaddon"

@@ -56,7 +56,7 @@ class ProfileConfigurationDialog(aqt.qt.QDialog):
 
     def _setup_ui_for_mode(self) -> None:
         match self.mode:
-            case DialogMode.Create:
+            case DialogMode.Create():
                 self._setup_create_profile_mode()
             case DialogMode.Edit(profile_name=edit_name, profile_settings=edit_settings):
                 self._setup_edit_mode(profile_name=edit_name)
