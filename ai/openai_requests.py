@@ -4,8 +4,6 @@ import json
 from typing import Any
 from dataclasses import dataclass
 
-from openai import RateLimitError
-
 from .request_exceptions import *
 from ..utils.constants import OPENAI_API_KEY, AI_URL
 
